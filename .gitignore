@@ -1,1 +1,6 @@
 CLAUDE.md
+data/
+logs/
+results/
+test/
+pyselectal.py

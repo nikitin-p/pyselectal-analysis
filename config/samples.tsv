@@ -1,0 +1,12 @@
+sample_id	dataset	genome	condition	replicate	subcellular	fastq
+# ----- LUHMES CAGE -----
+# luhmes_cage_d0_r1	luhmes_cage	hg38	day0	1	total	data/luhmes_cage/d0_r1.fastq.gz
+# luhmes_cage_d0_r2	luhmes_cage	hg38	day0	2	total	data/luhmes_cage/d0_r2.fastq.gz
+# ----- LUHMES NET-CAGE -----
+# luhmes_netcage_d0_r1	luhmes_netcage	hg38	day0	1	chromatin	data/luhmes_netcage/d0_r1.fastq.gz
+# ----- NET-CAGE paper cell lines -----
+# TODO: fill in after cell line selection
+# ----- Yeast CAGE -----
+# TODO: fill in after Lu & Lin 2019 accession lookup
+# ----- TLDR-seq -----
+# TODO: fill in after dataset is located

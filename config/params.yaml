@@ -1,0 +1,38 @@
+# Pipeline parameters — all paths relative to project root unless absolute
+
+# Reference indexes (absolute paths on the VM)
+star_index_hg38:   ""   # TODO: fill in
+star_index_saccer3: ""  # TODO: fill in
+
+# Paths
+pyselectal: "pyselectal.py"          # path to pyselectal.py
+results_bam:           "results/bam"
+results_bam_sub:       "results/bam_subsampled"
+results_five_prime:    "results/five_prime"
+results_figures:       "results/figures"
+
+# STAR mapping
+threads: 10
+mapq_threshold: 255         # keep only uniquely mapped reads
+star_extra_args: "--alignEndsType Local --outSAMattributes NH HI AS NM"
+
+# Subsampling
+subsample_seed: 42
+subsample_factor: 0.9       # target = 0.9 × min(retained depths)
+
+# pyselectal --count
+collapse_threshold: 1.0     # collapse categories below this % into 'other'
+mapped_prefix: 5            # bases of matched sequence to show for M-type ends
+
+# R analysis
+replicate_hclust_method: "complete"   # hclust linkage for heatmap
+chisq_min_count: 5                    # minimum expected count per cell for chi-square
+
+# Literature RT non-templated nucleotide addition preferences (Stage 5).
+# Source: Zhu et al. 2001 Biotechniques; Ewing & Martin 1999.
+# Override with values from any preferred reference; must sum to 1.
+rt_nontemplated_prefs:
+  A: 0.10
+  C: 0.50
+  G: 0.25
+  T: 0.15
