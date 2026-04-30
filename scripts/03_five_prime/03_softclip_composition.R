@@ -44,7 +44,7 @@ params <- yaml.load_file(params_f)
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
 # Literature RT non-templated nucleotide addition preferences.
-# Source: Zhu et al. 2001 (Biotechniques); Ewing & Martin 1999.
+# Source: Zhu et al. 2001 (Biotechniques). Citation needs verification before publication.
 # Override in params.yaml under rt_nontemplated_prefs: {A: x, C: x, G: x, T: x}
 default_rt_prefs <- list(A = 0.10, C = 0.50, G = 0.25, T = 0.15)
 rt_prefs_raw     <- params$rt_nontemplated_prefs %||% default_rt_prefs

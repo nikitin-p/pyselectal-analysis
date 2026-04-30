@@ -32,7 +32,7 @@ replicate_hclust_method: "complete"   # hclust linkage for heatmap
 chisq_min_count: 5                    # minimum expected count per cell for chi-square
 
 # Literature RT non-templated nucleotide addition preferences (Stage 5).
-# Source: Zhu et al. 2001 Biotechniques; Ewing & Martin 1999.
+# Source: Zhu et al. 2001 Biotechniques. Citation needs verification before publication.
 # Override with values from any preferred reference; must sum to 1.
 rt_nontemplated_prefs:
   A: 0.10
