@@ -1,4 +1,4 @@
-sample_id	dataset	genome	condition	replicate	subcellular	fastq
+sample_id	dataset	genome	condition	replicate	subcellular	fastq	bam
 # ----- LUHMES CAGE -----
 # luhmes_cage_d0_r1	luhmes_cage	hg38	day0	1	total	data/luhmes_cage/d0_r1.fastq.gz
 # luhmes_cage_d0_r2	luhmes_cage	hg38	day0	2	total	data/luhmes_cage/d0_r2.fastq.gz
@@ -7,13 +7,13 @@ sample_id	dataset	genome	condition	replicate	subcellular	fastq
 # ----- NET-CAGE paper cell lines -----
 # TODO: fill in after cell line selection
 # ----- Yeast CAGE (Börlin et al. 2019, CENPK113-7D) -----
-yeast_cage_ana_r1	yeast_cage	cenpk	anaerobic	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep1.fastq.gz
-yeast_cage_ana_r2	yeast_cage	cenpk	anaerobic	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep2.fastq.gz
-yeast_cage_eth_r1	yeast_cage	cenpk	ethanol	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep1.fastq.gz
-yeast_cage_eth_r2	yeast_cage	cenpk	ethanol	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep2.fastq.gz
-yeast_cage_glu_r1	yeast_cage	cenpk	glucose	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep1.fastq.gz
-yeast_cage_glu_r2	yeast_cage	cenpk	glucose	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep2.fastq.gz
-yeast_cage_nit_r1	yeast_cage	cenpk	nitrogen	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep1.fastq.gz
-yeast_cage_nit_r2	yeast_cage	cenpk	nitrogen	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep2.fastq.gz
+yeast_cage_ana_r1	yeast_cage	cenpk	anaerobic	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep1.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Ana_Rep1_sub.bam
+yeast_cage_ana_r2	yeast_cage	cenpk	anaerobic	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep2.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Ana_Rep2_sub.bam
+yeast_cage_eth_r1	yeast_cage	cenpk	ethanol	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep1.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Eth_Rep1_sub.bam
+yeast_cage_eth_r2	yeast_cage	cenpk	ethanol	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep2.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Eth_Rep2_sub.bam
+yeast_cage_glu_r1	yeast_cage	cenpk	glucose	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep1.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Glu_Rep1_sub.bam
+yeast_cage_glu_r2	yeast_cage	cenpk	glucose	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep2.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Glu_Rep2_sub.bam
+yeast_cage_nit_r1	yeast_cage	cenpk	nitrogen	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep1.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Nit_Rep1_sub.bam
+yeast_cage_nit_r2	yeast_cage	cenpk	nitrogen	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep2.fastq.gz	/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled/Nit_Rep2_sub.bam
 # ----- TLDR-seq -----
 # TODO: fill in after dataset is located
