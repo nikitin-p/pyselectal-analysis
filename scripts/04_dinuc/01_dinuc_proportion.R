@@ -80,9 +80,12 @@ load_genome <- function(genome_spec) {
 # ── seqlevel harmonisation ────────────────────────────────────────────────────
 harmonize_seqlevels_to_genome <- function(gr, genome) {
   if (inherits(genome, "FaFile")) {
-    fa_seqs <- as.character(seqnames(seqinfo(genome)))
-    keep <- intersect(seqlevels(gr), fa_seqs)
-    return(keepSeqlevels(gr, keep, pruning.mode = "coarse"))
+    fa_si   <- seqinfo(genome)
+    fa_seqs <- as.character(seqnames(fa_si))
+    keep    <- intersect(seqlevels(gr), fa_seqs)
+    gr      <- keepSeqlevels(gr, keep, pruning.mode = "coarse")
+    seqinfo(gr, new2old = match(seqlevels(gr), fa_seqs)) <- fa_si[seqlevels(gr)]
+    return(gr)
   }
   # BSgenome path
   try({ seqlevelsStyle(gr) <- seqlevelsStyle(genome) }, silent = TRUE)
