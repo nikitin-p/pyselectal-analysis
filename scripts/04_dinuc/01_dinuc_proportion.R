@@ -84,7 +84,7 @@ harmonize_seqlevels_to_genome <- function(gr, genome) {
     fa_seqs <- as.character(seqnames(fa_si))
     keep    <- intersect(seqlevels(gr), fa_seqs)
     gr      <- keepSeqlevels(gr, keep, pruning.mode = "coarse")
-    seqinfo(gr, new2old = match(seqlevels(gr), fa_seqs)) <- fa_si[seqlevels(gr)]
+    seqlengths(gr) <- seqlengths(fa_si)[seqlevels(gr)]
     return(gr)
   }
   # BSgenome path
