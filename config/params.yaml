@@ -2,7 +2,8 @@
 
 # Reference indexes (absolute paths on the VM)
 star_index_hg38:   ""   # TODO: fill in
-star_index_saccer3: ""  # TODO: fill in
+star_index_saccer3: ""  # TODO: fill in (standard sacCer3)
+star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_cenpk"
 
 # Paths
 pyselectal: "pyselectal.py"          # path to pyselectal.py

@@ -6,7 +6,14 @@ sample_id	dataset	genome	condition	replicate	subcellular	fastq
 # luhmes_netcage_d0_r1	luhmes_netcage	hg38	day0	1	chromatin	data/luhmes_netcage/d0_r1.fastq.gz
 # ----- NET-CAGE paper cell lines -----
 # TODO: fill in after cell line selection
-# ----- Yeast CAGE -----
-# TODO: fill in after Lu & Lin 2019 accession lookup
+# ----- Yeast CAGE (Börlin et al. 2019, CENPK113-7D) -----
+yeast_cage_ana_r1	yeast_cage	cenpk	anaerobic	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep1.fastq.gz
+yeast_cage_ana_r2	yeast_cage	cenpk	anaerobic	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Ana_Rep2.fastq.gz
+yeast_cage_eth_r1	yeast_cage	cenpk	ethanol	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep1.fastq.gz
+yeast_cage_eth_r2	yeast_cage	cenpk	ethanol	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Eth_Rep2.fastq.gz
+yeast_cage_glu_r1	yeast_cage	cenpk	glucose	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep1.fastq.gz
+yeast_cage_glu_r2	yeast_cage	cenpk	glucose	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Glu_Rep2.fastq.gz
+yeast_cage_nit_r1	yeast_cage	cenpk	nitrogen	1	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep1.fastq.gz
+yeast_cage_nit_r2	yeast_cage	cenpk	nitrogen	2	total	data/yeast_cage/20171106_CAGE_SequencingData_Nit_Rep2.fastq.gz
 # ----- TLDR-seq -----
 # TODO: fill in after dataset is located
