@@ -27,10 +27,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-log_info"Stage 6: dinucleotide proportions"
-log_info"  bam_dir : $BAM_DIR"
-log_info"  samples : $SAMPLES"
-log_info"  outdir  : $OUTDIR"
+log_info "Stage 6: dinucleotide proportions"
+log_info "  bam_dir : $BAM_DIR"
+log_info "  samples : $SAMPLES"
+log_info "  outdir  : $OUTDIR"
 
 mkdir -p "$OUTDIR"
 
@@ -41,4 +41,4 @@ Rscript "$SCRIPT_DIR/01_dinuc_proportion.R" \
     --params   "$PARAMS"    \
     "${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}"
 
-log_info"Stage 6 complete. Outputs in $OUTDIR"
+log_info "Stage 6 complete. Outputs in $OUTDIR"
