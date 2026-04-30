@@ -55,7 +55,7 @@ if (!force && file.exists(out_tsv)) {
 message("Stage 8 step 2: cluster + annotate")
 message("  loading typed CTSS: ", ctss_f)
 
-ctss <- fread(ctss_f)
+ctss <- fread(cmd = paste("zcat", shQuote(ctss_f)))
 message("  rows: ", nrow(ctss))
 
 # ── genome loading (same helper as Stage 6) ───────────────────────────────────
