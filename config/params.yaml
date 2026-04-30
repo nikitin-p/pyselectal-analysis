@@ -7,6 +7,7 @@ star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_inde
 
 # Paths
 pyselectal: "pyselectal.py"          # path to pyselectal.py
+conda_env_pyselectal: "pysam"        # conda env that has pyselectal dependencies
 results_bam:           "results/bam"
 results_bam_sub:       "results/bam_subsampled"
 results_five_prime:    "results/five_prime"

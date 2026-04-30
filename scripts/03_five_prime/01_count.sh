@@ -32,6 +32,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 PYSELECTAL="$(yaml_get pyselectal "$PARAMS")"
+CONDA_ENV="$(yaml_get conda_env_pyselectal "$PARAMS")"
 COLLAPSE="$(yaml_get collapse_threshold "$PARAMS")"
 MAPPED_PFX="$(yaml_get mapped_prefix "$PARAMS")"
 [[ -z "$OUTDIR" ]] && OUTDIR="$(yaml_get results_five_prime "$PARAMS")"
@@ -84,7 +85,7 @@ while IFS=$'\t' read -ra row; do
 
     log_info "[$sid] counting 5' end types …"
     mkdir -p "$(dirname "$log")"
-    if conda run -n samtools python "$PYSELECTAL" \
+    if conda run -n "$CONDA_ENV" python "$PYSELECTAL" \
             -i "$bam" -c \
             --collapse-threshold "$COLLAPSE" \
             --mapped-prefix "$MAPPED_PFX" \
