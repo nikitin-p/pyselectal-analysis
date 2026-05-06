@@ -31,6 +31,18 @@ mapped_prefix: 5            # bases of matched sequence to show for M-type ends
 annotation_bed_yeast: ""   # CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019
 annotation_bed_hg38:  ""   # TODO: fill in after hg38 annotation source decision
 
+# Stage 10: CAGEr
+results_cager:                "results/cager"
+cager_tpm_threshold:          1       # TPM floor for filterLowExpCTSS
+cager_max_dist:               20      # distclu maxDist (CAGEr default)
+cager_keep_singletons_above:  5       # distclu keepSingletonsAbove
+cager_iqw_qlow:               0.1     # lower quantile for IQW
+cager_iqw_qup:                0.9     # upper quantile for IQW
+cager_iqw_tpm_threshold:      3       # tpmThreshold for plotInterquantileWidth
+
+# Stage 11: expression dynamics
+expr_min_pct_1Sg: 70                  # % 1Sg threshold for "high-1Sg" cluster selection
+
 # R analysis
 replicate_hclust_method: "complete"   # hclust linkage for heatmap
 chisq_min_count: 5                    # minimum expected count per cell for chi-square
