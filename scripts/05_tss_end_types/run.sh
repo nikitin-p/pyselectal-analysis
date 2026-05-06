@@ -49,6 +49,22 @@ $RSCRIPT "$SCRIPT_DIR/03_plot.R" \
     --params  "$PARAMS" \
     $FORCE_FLAG
 
-log_info "Stage 8 complete."
-log_info "  matrix  → results/tss/tss_matrix.tsv"
-log_info "  figures → results/figures/08_*.pdf"
+log_info "  step 4: cluster + annotate"
+$RSCRIPT "$SCRIPT_DIR/04_cluster_annotate.R" \
+    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --samples "$SAMPLES" \
+    --outdir  "$ROOT_DIR/results/tss" \
+    --params  "$PARAMS" \
+    $FORCE_FLAG
+
+log_info "  step 5: plot clusters"
+$RSCRIPT "$SCRIPT_DIR/05_plot_clusters.R" \
+    --clustered  "$ROOT_DIR/results/tss/tss_clustered.tsv" \
+    --hclust_rds "$ROOT_DIR/results/tss/tss_hclust.rds" \
+    --outdir     "$ROOT_DIR/results/figures" \
+    $FORCE_FLAG
+
+log_info "Stage 8+9 complete."
+log_info "  matrix    → results/tss/tss_matrix.tsv"
+log_info "  clustered → results/tss/tss_clustered.tsv"
+log_info "  figures   → results/figures/08_*.pdf  09_*.pdf"

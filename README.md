@@ -35,7 +35,7 @@ This project characterizes TSS initiator usage and soft-clip patterns (1Sg / 2Sg
 | 6. Initiator dinucleotide proportions (CTSS ±1 bp) | `scripts/04_dinuc/run.sh` | done (yeast) |
 | 7. YR vs YC enrichment across conditions | `scripts/04_dinuc/02_yr_enrichment.R` | done (yeast) |
 | 8. TSS × end-type matrix + initiator annotation | `scripts/05_tss_end_types/run.sh` | scripted |
-| 9. Hierarchical clustering of TSS + ChIPseeker annotation | — | not started |
+| 9. TSS hierarchical clustering + BED annotation | `scripts/05_tss_end_types/04_cluster_annotate.R` | scripted |
 | 10. CAGEr promoter clusters + gene-type enrichment | — | not started |
 | 11. Expression dynamics of TSS clusters | — | not started |
 | 12. Repetitive vs unique regions; TLDR-seq | — | not started |
@@ -57,7 +57,7 @@ results/
   dinuc/                dinucleotide proportions (all reads)
   dinuc_1Sg/            dinucleotide proportions (1Sg reads only)
   dinuc_2Sg/            dinucleotide proportions (2Sg reads only)
-  tss/                  typed_ctss.tsv.gz (per-position read type counts), tss_matrix.tsv (per-cluster matrix)
+  tss/                  typed_ctss.tsv.gz, tss_matrix.tsv, tss_clustered.tsv, tss_hclust.rds
   cager/                (planned) CAGEr promoter clusters
   annotation/           (planned) ChIPseeker output
   figures/              all PDFs and TSVs from analysis scripts

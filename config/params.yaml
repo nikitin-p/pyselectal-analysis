@@ -27,6 +27,10 @@ subsample_factor: 0.9       # target = 0.9 × min(retained depths)
 collapse_threshold: 1.0     # collapse categories below this % into 'other'
 mapped_prefix: 5            # bases of matched sequence to show for M-type ends
 
+# Annotation BED files (absolute paths on the VM; leave empty if not yet available)
+annotation_bed_yeast: ""   # CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019
+annotation_bed_hg38:  ""   # TODO: fill in after hg38 annotation source decision
+
 # R analysis
 replicate_hclust_method: "complete"   # hclust linkage for heatmap
 chisq_min_count: 5                    # minimum expected count per cell for chi-square
