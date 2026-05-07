@@ -4,7 +4,7 @@
 # sacCer3: UCSC Golden Path (BSgenome.Scerevisiae.UCSC.sacCer3)
 # hg38:    GENCODE (GRCh38 primary assembly; download from gencodegenes.org)
 star_index_hg38:    ""   # TODO: fill in after GENCODE genome is downloaded
-star_index_saccer3: ""   # TODO: fill in (standard UCSC sacCer3)
+star_index_saccer3: "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_saccer3"
 star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_cenpk"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
