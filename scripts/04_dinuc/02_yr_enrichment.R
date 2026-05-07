@@ -15,6 +15,7 @@ suppressPackageStartupMessages({
   library(tidyr)
   library(readr)
   library(tibble)
+  library(pheatmap)
   library(yaml)
 })
 
@@ -144,6 +145,64 @@ for (et in c("1Sg", "2Sg")) {
   ggsave(file.path(outdir, paste0("07_dinuc_heatmap_", et, ".pdf")),
          p_heat, width = 6, height = 5)
   message("Saved: 07_dinuc_heatmap_", et, ".pdf")
+}
+
+# ── Figure 4: z-score dinucleotide heatmap with hierarchical clustering ───────
+# Rows = initiator dinucleotides; columns = samples.
+# Values = z-score of alignment counts (sum_score) within each sample so that
+# sample-level depth differences are removed before clustering.
+# Clustering: Euclidean distance, Ward.D2 linkage (params: dinuc_dist_method,
+# dinuc_hclust_method).
+hclust_method_dinuc <- params$dinuc_hclust_method %||% "ward.D2"
+dist_method_dinuc   <- params$dinuc_dist_method   %||% "euclidean"
+
+for (et in c("1Sg", "2Sg")) {
+  df_et <- dat |>
+    filter(end_type == et) |>
+    select(sample_id, dinucleotide, sum_score)
+
+  count_mat <- df_et |>
+    pivot_wider(names_from = sample_id, values_from = sum_score, values_fill = 0) |>
+    column_to_rownames("dinucleotide") |>
+    as.matrix()
+
+  # Remove constant rows (no variation across samples — cannot z-score)
+  row_sd <- apply(count_mat, 1, sd)
+  count_mat <- count_mat[row_sd > 0, , drop = FALSE]
+
+  if (nrow(count_mat) == 0) {
+    message("No variable dinucleotides for ", et, " — skipping z-score heatmap")
+    next
+  }
+
+  # Z-score within each sample (column-wise): removes inter-sample depth differences
+  zscore_mat <- scale(count_mat)
+
+  # Column annotation: condition
+  ann_col <- meta |>
+    filter(sample_id %in% colnames(zscore_mat)) |>
+    select(sample_id, condition) |>
+    column_to_rownames("sample_id") |>
+    as.data.frame()
+  ann_col <- ann_col[colnames(zscore_mat), , drop = FALSE]
+
+  out_pdf <- file.path(outdir, paste0("07_dinuc_zscore_heatmap_", et, ".pdf"))
+  pdf(out_pdf,
+      width  = max(6, ncol(zscore_mat) * 0.45 + 2.5),
+      height = max(4, nrow(zscore_mat) * 0.35 + 2))
+  pheatmap(zscore_mat,
+           clustering_method       = hclust_method_dinuc,
+           clustering_distance_rows = dist_method_dinuc,
+           clustering_distance_cols = dist_method_dinuc,
+           annotation_col          = ann_col,
+           color                   = colorRampPalette(c("#4DBBD5", "white", "#E64B35"))(100),
+           border_color            = NA,
+           fontsize                = 9,
+           main                    = paste0("Initiator dinucleotide z-scores — ", et,
+                                            "\n(distance: ", dist_method_dinuc,
+                                            ", linkage: ", hclust_method_dinuc, ")"))
+  dev.off()
+  message("Saved: ", basename(out_pdf))
 }
 
 # ── Chi-square: YR vs non-YR across conditions, per end_type ─────────────────

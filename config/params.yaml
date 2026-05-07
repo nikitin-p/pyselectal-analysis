@@ -1,11 +1,13 @@
 # Pipeline parameters — all paths relative to project root unless absolute
 
-# Reference indexes (absolute paths on the VM)
-star_index_hg38:   ""   # TODO: fill in
-star_index_saccer3: ""  # TODO: fill in (standard sacCer3)
+# ── Reference indexes (absolute paths on the VM) ─────────────────────────────
+# sacCer3: UCSC Golden Path (BSgenome.Scerevisiae.UCSC.sacCer3)
+# hg38:    GENCODE (GRCh38 primary assembly; download from gencodegenes.org)
+star_index_hg38:    ""   # TODO: fill in after GENCODE genome is downloaded
+star_index_saccer3: ""   # TODO: fill in (standard UCSC sacCer3)
 star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_cenpk"
 
-# Paths
+# ── Paths ─────────────────────────────────────────────────────────────────────
 pyselectal: "pyselectal.py"          # path to pyselectal.py
 conda_env_pyselectal: "pysam"        # conda env that has pyselectal dependencies
 conda_env_r:          "r_cage"       # conda env that has R and Bioconductor packages
@@ -14,24 +16,27 @@ results_bam_sub:       "results/bam_subsampled"
 results_five_prime:    "results/five_prime"
 results_figures:       "results/figures"
 
-# STAR mapping
+# ── STAR mapping ──────────────────────────────────────────────────────────────
 threads: 10
 mapq_threshold: 255         # keep only uniquely mapped reads
 star_extra_args: "--alignEndsType Local --outSAMattributes NH HI AS NM"
 
-# Subsampling
+# ── Subsampling ───────────────────────────────────────────────────────────────
 subsample_seed: 42
-subsample_factor: 0.9       # target = 0.9 × min(retained depths)
+subsample_factor: 0.9              # target = floor(0.9 × min(retained depths))
+min_library_depth_fraction: 0.5   # exclude libraries with < 50 % of median depth
 
-# pyselectal --count
-collapse_threshold: 1.0     # collapse categories below this % into 'other'
-mapped_prefix: 5            # bases of matched sequence to show for M-type ends
+# ── pyselectal --count ────────────────────────────────────────────────────────
+collapse_threshold: 0.1    # collapse categories below 0.1 % of total into 'other'
+mapped_prefix: 5           # bases of matched sequence to show for M-type ends
 
-# Annotation BED files (absolute paths on the VM; leave empty if not yet available)
+# ── Annotation BED files (absolute paths on the VM; leave empty if not yet available)
+# sacCer3: use CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019 (custom yeast assembly)
+# hg38:    will use GENCODE GTF/BED after annotation source is finalised
 annotation_bed_yeast: ""   # CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019
-annotation_bed_hg38:  ""   # TODO: fill in after hg38 annotation source decision
+annotation_bed_hg38:  ""   # TODO: fill in after hg38 GENCODE annotation decision
 
-# Stage 10: CAGEr
+# ── Stage 10: CAGEr ───────────────────────────────────────────────────────────
 results_cager:                "results/cager"
 cager_tpm_threshold:          1       # TPM floor for filterLowExpCTSS
 cager_max_dist:               20      # distclu maxDist (CAGEr default)
@@ -40,14 +45,23 @@ cager_iqw_qlow:               0.1     # lower quantile for IQW
 cager_iqw_qup:                0.9     # upper quantile for IQW
 cager_iqw_tpm_threshold:      3       # tpmThreshold for plotInterquantileWidth
 
-# Stage 11: expression dynamics
+# ── Stage 11: expression dynamics ────────────────────────────────────────────
 expr_min_pct_1Sg: 70                  # % 1Sg threshold for "high-1Sg" cluster selection
 
-# R analysis
-replicate_hclust_method: "complete"   # hclust linkage for heatmap
+# ── R analysis — replicate heatmap (Stage 4) ──────────────────────────────────
+# Distance metric: Euclidean (pheatmap default).
+# Linkage: complete (Furthest Neighbour). Controls how replicate/condition rows cluster.
+replicate_hclust_method: "complete"   # hclust linkage for replicate frequency heatmap
 chisq_min_count: 5                    # minimum expected count per cell for chi-square
 
-# Literature RT non-templated nucleotide addition preferences (Stage 5).
+# ── R analysis — dinucleotide z-score heatmap (Stage 7) ──────────────────────
+# Rows = initiator dinucleotides; columns = samples.
+# Values = z-score of alignment counts within each sample (column-wise scaling).
+# Distance metric: Euclidean. Linkage: Ward.D2 (minimises total within-cluster variance).
+dinuc_hclust_method: "ward.D2"        # hclust linkage for dinucleotide z-score heatmap
+dinuc_dist_method:   "euclidean"      # distance metric for dinucleotide clustering
+
+# ── Literature RT non-templated nucleotide addition preferences (Stage 5) ─────
 # Source: Zhu et al. 2001 Biotechniques. Citation needs verification before publication.
 # Override with values from any preferred reference; must sum to 1.
 rt_nontemplated_prefs:
