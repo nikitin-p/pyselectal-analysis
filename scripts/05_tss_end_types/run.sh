@@ -22,7 +22,7 @@ FORCE_FLAG=""
 [[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
 
 CONDA_ENV="$(yaml_get conda_env_r "$PARAMS")"
-RSCRIPT="conda run -n $CONDA_ENV Rscript"
+RSCRIPT=$(conda run -n "$CONDA_ENV" which Rscript)
 
 log_info "Stage 8: TSS end-type matrix"
 

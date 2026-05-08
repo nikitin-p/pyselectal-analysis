@@ -19,7 +19,7 @@ FORCE_FLAG=""
 [[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
 
 CONDA_R="$(yaml_get conda_env_r "$PARAMS")"
-RSCRIPT="conda run -n $CONDA_R Rscript"
+RSCRIPT=$(conda run -n "$CONDA_R" which Rscript)
 
 BAM_SUB="$ROOT_DIR/results/bam_subsampled"
 BAM_SEL="$ROOT_DIR/results/bam_selected"

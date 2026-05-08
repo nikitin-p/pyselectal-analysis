@@ -9,6 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$ROOT_DIR/scripts/utils/log.sh"
+source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 
 BAM_DIR="$ROOT_DIR/results/bam_subsampled"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
@@ -27,6 +28,9 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+CONDA_R="$(yaml_get conda_env_r "$PARAMS")"
+RSCRIPT=$(conda run -n "$CONDA_R" which Rscript)
+
 log_info "Stage 6: dinucleotide proportions"
 log_info "  bam_dir : $BAM_DIR"
 log_info "  samples : $SAMPLES"
@@ -34,7 +38,7 @@ log_info "  outdir  : $OUTDIR"
 
 mkdir -p "$OUTDIR"
 
-Rscript "$SCRIPT_DIR/01_dinuc_proportion.R" \
+$RSCRIPT "$SCRIPT_DIR/01_dinuc_proportion.R" \
     --bam_dir  "$BAM_DIR"   \
     --samples  "$SAMPLES"   \
     --outdir   "$OUTDIR"    \
