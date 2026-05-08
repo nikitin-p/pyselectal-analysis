@@ -9,6 +9,8 @@ star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_inde
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 pyselectal: "pyselectal.py"          # path to pyselectal.py
+conda_env_star:       "star"         # conda env that has STAR
+conda_env_tools:      "tools"        # conda env that has samtools and other CLI tools
 conda_env_pyselectal: "pysam"        # conda env that has pyselectal dependencies
 conda_env_r:          "r_cage"       # conda env that has R and Bioconductor packages
 results_bam:           "results/bam"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stage 2: subsample BAMs to equal depth.
-# Usage: bash scripts/02_subsample/01_subsample.sh [--force]
+# Usage: bash scripts/02_subsample/01_subsample.sh [--bam_dir DIR] [--out_dir DIR] [--force]
 #
 # 1. Count reads in every *_uniq.bam.
 # 2. Compute the median depth across all libraries.
@@ -17,13 +17,28 @@ source "$PROJECT_ROOT/scripts/utils/log.sh"
 source "$PROJECT_ROOT/scripts/utils/parse_yaml.sh"
 
 FORCE=0
-[[ "${1:-}" == "--force" ]] && FORCE=1
+BAM_IN_DIR=""
+BAM_OUT_DIR=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --bam_dir) BAM_IN_DIR="$2";  shift 2 ;;
+        --out_dir) BAM_OUT_DIR="$2"; shift 2 ;;
+        --force)   FORCE=1;          shift   ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+done
 
 # ── config ────────────────────────────────────────────────────────────────────
 PARAMS="$PROJECT_ROOT/config/params.yaml"
-BAM_IN_DIR="/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam"
-BAM_OUT_DIR="/home/pnikitin/cage/analysis_pyselectal_for_paper/results/bam_subsampled"
-LOG_DIR="/home/pnikitin/cage/analysis_pyselectal_for_paper/logs"
+[[ -z "$BAM_IN_DIR"  ]] && BAM_IN_DIR="$(yaml_get results_bam     "$PARAMS")"
+[[ -z "$BAM_OUT_DIR" ]] && BAM_OUT_DIR="$(yaml_get results_bam_sub "$PARAMS")"
+[[ "$BAM_IN_DIR"  != /* ]] && BAM_IN_DIR="$PROJECT_ROOT/$BAM_IN_DIR"
+[[ "$BAM_OUT_DIR" != /* ]] && BAM_OUT_DIR="$PROJECT_ROOT/$BAM_OUT_DIR"
+LOG_DIR="$PROJECT_ROOT/logs"
+
+CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
+SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
 
 SEED="$(yaml_get subsample_seed "$PARAMS")"
 FACTOR="$(yaml_get subsample_factor "$PARAMS")"
@@ -31,7 +46,6 @@ MIN_FRAC="$(yaml_get min_library_depth_fraction "$PARAMS")"
 THREADS=4
 # ─────────────────────────────────────────────────────────────────────────────
 
-require_cmd samtools
 mkdir -p "$BAM_OUT_DIR" "$LOG_DIR"
 
 # ── collect BAMs and count reads ──────────────────────────────────────────────
@@ -43,7 +57,7 @@ log_info "Found ${#BAMS[@]} BAMs — counting reads..."
 declare -A COUNTS
 for BAM in "${BAMS[@]}"; do
     SAMPLE=$(basename "$BAM" _uniq.bam)
-    N=$(samtools view -c "$BAM")
+    N=$($SAMTOOLS view -c "$BAM")
     COUNTS[$SAMPLE]=$N
     log_info "  $SAMPLE: $N"
 done
@@ -100,12 +114,12 @@ for SAMPLE in "${!RETAINED[@]}"; do
 
     log_info "$SAMPLE — N=$N  frac=$FRAC  -s $S_FLAG"
 
-    samtools view -b -s "$S_FLAG" -@ "$THREADS" "$BAM" \
-        | samtools sort -@ "$THREADS" -o "$OUT" \
+    $SAMTOOLS view -b -s "$S_FLAG" -@ "$THREADS" "$BAM" \
+        | $SAMTOOLS sort -@ "$THREADS" -o "$OUT" \
         2> "$LOG"
 
-    samtools index "$OUT"
-    ACTUAL=$(samtools view -c "$OUT")
+    $SAMTOOLS index "$OUT"
+    ACTUAL=$($SAMTOOLS view -c "$OUT")
     log_info "$SAMPLE — done: $ACTUAL reads → $OUT"
 done
 

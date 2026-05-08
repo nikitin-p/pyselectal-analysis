@@ -39,10 +39,10 @@ done
 
 PYSELECTAL="$(yaml_get pyselectal "$PARAMS")"
 CONDA_ENV="$(yaml_get conda_env_pyselectal "$PARAMS")"
+CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
+SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
 [[ "$PYSELECTAL" != /* ]] && PYSELECTAL="$ROOT_DIR/$PYSELECTAL"
 [[ -z "$OUT_DIR" ]] && OUT_DIR="$(dirname "$BAM_DIR")/bam_selected"
-
-require_cmd samtools
 [[ -f "$PYSELECTAL" ]] || die "pyselectal not found: $PYSELECTAL"
 [[ -f "$SAMPLES" ]]    || die "Samples file not found: $SAMPLES"
 [[ -n "$BAM_DIR" ]]    || die "--bam_dir is required"
@@ -93,7 +93,7 @@ while IFS=$'\t' read -ra row; do
             log_info "[$sid/$TYPE] selecting spec=$SPEC from $bam"
             conda run -n "$CONDA_ENV" python "$PYSELECTAL" \
                 -i "$bam" --select "$SPEC" -o "$OUT_BAM"
-            samtools index "$OUT_BAM"
+            $SAMTOOLS index "$OUT_BAM"
             log_info "[$sid/$TYPE] done → $OUT_BAM"
         fi
 

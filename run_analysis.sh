@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
-# Top-level runner: stages 3–9 (five-prime counts → dinucleotides → TSS matrix).
-# Stages 1 (mapping) and 2 (subsampling) are assumed complete.
+# Top-level runner: stages 1–9 (mapping → dinucleotides → TSS matrix).
 #
 # Usage:
 #   bash run_analysis.sh [--force]
 #
 # Prerequisites:
-#   - results/bam_subsampled/ populated
-#   - genome column in config/samples.tsv pointing to the correct FASTA
+#   - FASTQ paths filled in config/samples.tsv
+#   - STAR indexes built (star_index_saccer3 / star_index_hg38 in params.yaml)
 
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +23,16 @@ RSCRIPT="conda run -n $CONDA_R Rscript"
 
 BAM_SUB="$ROOT_DIR/results/bam_subsampled"
 BAM_SEL="$ROOT_DIR/results/bam_selected"
+
+# ── Stage 1: STAR mapping ─────────────────────────────────────────────────────
+log_info "Stage 1: STAR mapping"
+bash "$ROOT_DIR/scripts/01_map/01_map.sh" \
+    --samples "$SAMPLES" \
+    $FORCE_FLAG
+
+# ── Stage 2: subsampling ──────────────────────────────────────────────────────
+log_info "Stage 2: subsampling to equal depth"
+bash "$ROOT_DIR/scripts/02_subsample/01_subsample.sh" $FORCE_FLAG
 
 # ── Stage 3: pyselectal --count ───────────────────────────────────────────────
 log_info "Stage 3: 5' end type counts"

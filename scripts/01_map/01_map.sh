@@ -11,7 +11,7 @@
 # Reads from samples.tsv: sample_id, dataset, fastq.
 # Skips rows with an empty fastq column or no fastq path.
 # STAR index is selected by dataset:
-#   yeast_cage              -> star_index_cenpk
+#   yeast_cage              -> star_index_saccer3
 #   luhmes_cage / luhmes_netcage / netcage_* -> star_index_hg38
 #
 # Outputs: {outdir}/{sample_id}_uniq.bam  (sorted, indexed, MAPQ-filtered)
@@ -43,13 +43,15 @@ MAPQ="$(yaml_get mapq_threshold "$PARAMS")"
 STAR_EXTRA_RAW="$(yaml_get star_extra_args "$PARAMS")"
 STAR_IDX_SACCER3="$(yaml_get star_index_saccer3 "$PARAMS")"
 STAR_IDX_HG38="$(yaml_get star_index_hg38 "$PARAMS")"
+CONDA_STAR="$(yaml_get conda_env_star "$PARAMS")"
+CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
 [[ -z "$OUTDIR" ]] && OUTDIR="$ROOT_DIR/$(yaml_get results_bam "$PARAMS")"
 
 # Split extra args string into array for safe quoting
 read -ra STAR_EXTRA <<< "$STAR_EXTRA_RAW"
 
-require_cmd STAR
-require_cmd samtools
+STAR="conda run -n $CONDA_STAR STAR"
+SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
 [[ -f "$SAMPLES" ]] || die "Samples file not found: $SAMPLES"
 
 mkdir -p "$OUTDIR" "$ROOT_DIR/logs"
@@ -119,7 +121,7 @@ while IFS=$'\t' read -ra row; do
     log_info "[$sid]   fastq : $fastq"
     mkdir -p "$TMP_DIR"
 
-    STAR \
+    $STAR \
         --runThreadN "$THREADS" \
         --genomeDir "$STAR_IDX" \
         --readFilesIn "$fastq" \
@@ -140,10 +142,10 @@ while IFS=$'\t' read -ra row; do
     fi
 
     log_info "[$sid] filtering MAPQ ≥ $MAPQ …"
-    samtools view -b -q "$MAPQ" -@ "$THREADS" "$RAW_BAM" -o "$OUT_BAM" 2>> "$LOG"
-    samtools index "$OUT_BAM"
+    $SAMTOOLS view -b -q "$MAPQ" -@ "$THREADS" "$RAW_BAM" -o "$OUT_BAM" 2>> "$LOG"
+    $SAMTOOLS index "$OUT_BAM"
 
-    MAPPED=$(samtools view -c "$OUT_BAM")
+    MAPPED=$($SAMTOOLS view -c "$OUT_BAM")
     log_info "[$sid] done — $MAPPED uniquely mapped reads → $OUT_BAM"
 
     rm -rf "$TMP_DIR"
