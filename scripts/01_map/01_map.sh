@@ -50,8 +50,8 @@ CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
 # Split extra args string into array for safe quoting
 read -ra STAR_EXTRA <<< "$STAR_EXTRA_RAW"
 
-STAR="conda run -n $CONDA_STAR STAR"
-SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
+STAR=$(conda run -n "$CONDA_STAR" which STAR)
+SAMTOOLS=$(conda run -n "$CONDA_TOOLS" which samtools)
 [[ -f "$SAMPLES" ]] || die "Samples file not found: $SAMPLES"
 
 mkdir -p "$OUTDIR" "$ROOT_DIR/logs"

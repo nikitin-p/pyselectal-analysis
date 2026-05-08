@@ -38,7 +38,7 @@ PARAMS="$PROJECT_ROOT/config/params.yaml"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
-SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
+SAMTOOLS=$(conda run -n "$CONDA_TOOLS" which samtools)
 
 SEED="$(yaml_get subsample_seed "$PARAMS")"
 FACTOR="$(yaml_get subsample_factor "$PARAMS")"

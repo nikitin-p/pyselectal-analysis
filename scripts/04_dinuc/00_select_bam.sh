@@ -40,7 +40,7 @@ done
 PYSELECTAL="$(yaml_get pyselectal "$PARAMS")"
 CONDA_ENV="$(yaml_get conda_env_pyselectal "$PARAMS")"
 CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
-SAMTOOLS="conda run -n $CONDA_TOOLS samtools"
+SAMTOOLS=$(conda run -n "$CONDA_TOOLS" which samtools)
 [[ "$PYSELECTAL" != /* ]] && PYSELECTAL="$ROOT_DIR/$PYSELECTAL"
 [[ -z "$OUT_DIR" ]] && OUT_DIR="$(dirname "$BAM_DIR")/bam_selected"
 [[ -f "$PYSELECTAL" ]] || die "pyselectal not found: $PYSELECTAL"
