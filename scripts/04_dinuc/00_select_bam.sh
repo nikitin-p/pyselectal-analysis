@@ -53,7 +53,7 @@ mkdir -p "$OUT_DIR"
 select_spec() {
     case "$1" in
         1Sg) echo "1Sg"  ;;
-        2Sg) echo "2..Sg" ;;
+        2Sg) echo "2Sgg"  ;;
         *)   echo "$1"   ;;
     esac
 }
