@@ -79,7 +79,7 @@ while IFS=$'\t' read -ra row; do
 
     if [[ ! -f "$bam" ]]; then
         log_warn "[$sid] BAM not found: $bam — skipping"
-        (( n_failed++ )) || true
+        (( n_skipped++ )) || true
         continue
     fi
 

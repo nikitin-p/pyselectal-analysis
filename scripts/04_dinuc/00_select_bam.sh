@@ -83,6 +83,11 @@ while IFS=$'\t' read -ra row; do
     bam="${row[$bam_col]}"
     [[ "$bam" != /* ]] && bam="$ROOT_DIR/$bam"
 
+    if [[ ! -f "$bam" ]]; then
+        log_warn "[$sid] BAM not found: $bam — skipping"
+        continue
+    fi
+
     for TYPE in $TYPES; do
         SPEC="$(select_spec "$TYPE")"
         OUT_BAM="$OUT_DIR/${sid}_${TYPE}.bam"
