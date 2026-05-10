@@ -79,9 +79,18 @@ bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
     --outdir  "$ROOT_DIR/results/dinuc_2Sg" \
     $FORCE_FLAG
 
+# ── Stage 6d: dinucleotide proportions (all reads — unfiltered subsampled BAMs)
+log_info "Stage 6d: dinucleotide proportions — all reads"
+bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
+    --bam_dir "$BAM_SUB" \
+    --samples "$SAMPLES" \
+    --outdir  "$ROOT_DIR/results/dinuc_all" \
+    $FORCE_FLAG
+
 # ── Stage 7: YR/YC enrichment ────────────────────────────────────────────────
 log_info "Stage 7: YR/YC enrichment"
 $RSCRIPT "$ROOT_DIR/scripts/04_dinuc/02_yr_enrichment.R" \
+    --dinuc_all "$ROOT_DIR/results/dinuc_all/all_dinuc_proportions.tsv" \
     --samples "$SAMPLES" \
     --outdir  "$ROOT_DIR/results/figures" \
     --params  "$PARAMS"

@@ -5,6 +5,7 @@
 #   Rscript scripts/04_dinuc/02_yr_enrichment.R \
 #       --dinuc_1sg  results/dinuc_1Sg/all_dinuc_proportions.tsv \
 #       --dinuc_2sg  results/dinuc_2Sg/all_dinuc_proportions.tsv \
+#       --dinuc_all  results/dinuc_all/all_dinuc_proportions.tsv \
 #       --samples    config/samples.tsv \
 #       --outdir     results/figures \
 #       --params     config/params.yaml
@@ -30,6 +31,7 @@ get_arg <- function(flag, default = NULL) {
 
 dinuc_1sg <- get_arg("--dinuc_1sg", "results/dinuc_1Sg/all_dinuc_proportions.tsv")
 dinuc_2sg <- get_arg("--dinuc_2sg", "results/dinuc_2Sg/all_dinuc_proportions.tsv")
+dinuc_all <- get_arg("--dinuc_all", "results/dinuc_all/all_dinuc_proportions.tsv")
 samples_f <- get_arg("--samples",   "config/samples.tsv")
 outdir    <- get_arg("--outdir",    "results/figures")
 params_f  <- get_arg("--params",    "config/params.yaml")
@@ -67,7 +69,8 @@ load_dinuc <- function(path, type_label) {
 
 d1 <- load_dinuc(dinuc_1sg, "1Sg")
 d2 <- load_dinuc(dinuc_2sg, "2Sg")
-dat <- bind_rows(d1, d2) |>
+dall <- load_dinuc(dinuc_all, "all")
+dat <- bind_rows(d1, d2, dall) |>
   left_join(meta, by = "sample_id")
 
 # ── aggregate to YR / YC / other per sample ───────────────────────────────────
@@ -115,7 +118,8 @@ p_cond <- ggplot(yr_cond,
                 position = position_dodge(0.7), width = 0.2) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                      limits = c(0, 1)) +
-  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sg" = "#F39B7F")) +
+  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sg" = "#F39B7F",
+                                "all" = "#4DBBD5")) +
   labs(title = "YR proportion by condition",
        x = NULL, y = "YR proportion (mean ± SD across replicates)",
        fill = "End type") +
@@ -132,7 +136,7 @@ dn_heat <- dat |>
   summarise(mean_prop = mean(proportion), .groups = "drop") |>
   mutate(label = paste0(end_type, "\n", condition))
 
-for (et in c("1Sg", "2Sg")) {
+for (et in c("1Sg", "2Sg", "all")) {
   df_et <- dn_heat |> filter(end_type == et)
   p_heat <- ggplot(df_et, aes(x = condition, y = dinucleotide, fill = mean_prop)) +
     geom_tile(colour = "white") +
@@ -156,7 +160,7 @@ for (et in c("1Sg", "2Sg")) {
 hclust_method_dinuc <- params$dinuc_hclust_method %||% "ward.D2"
 dist_method_dinuc   <- params$dinuc_dist_method   %||% "euclidean"
 
-for (et in c("1Sg", "2Sg")) {
+for (et in c("1Sg", "2Sg", "all")) {
   df_et <- dat |>
     filter(end_type == et) |>
     select(sample_id, dinucleotide, sum_score)
@@ -206,7 +210,7 @@ for (et in c("1Sg", "2Sg")) {
 }
 
 # ── Chi-square: YR vs non-YR across conditions, per end_type ─────────────────
-chisq_results <- lapply(c("1Sg", "2Sg"), function(et) {
+chisq_results <- lapply(c("1Sg", "2Sg", "all"), function(et) {
   # pool replicates per condition
   pooled <- sample_cat |>
     filter(end_type == et) |>

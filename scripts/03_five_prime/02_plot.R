@@ -44,15 +44,18 @@ chisq_min_count <- params$chisq_min_count %||% 5
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
 classify_type <- function(type) {
-  # 1Sg  → soft-clip length 1, base G
-  # 2Sg  → soft-clip length 2, first base G (e.g. 2Sgg, 2Sgc, 2Sgt, 2Sga)
-  # M    → mapped 5' end (no soft-clip), e.g. 36Mctcac
-  # other → all remaining soft-clips
+  # 1Sg               → soft-clip length 1, base G
+  # 2Sg               → soft-clip length 2, first base G (e.g. 2Sgg, 2Sgc)
+  # M                 → mapped 5' end (no soft-clip), e.g. 36Mctcac
+  # other_soft_clipped → pyselectal collapsed rare soft-clipped types
+  # other_mapped       → pyselectal collapsed rare mapped types
   dplyr::case_when(
-    type == "1Sg"                       ~ "1Sg",
-    grepl("^2Sg",  type, ignore.case = TRUE) ~ "2Sg",
-    grepl("^[0-9]+M", type)             ~ "M",
-    TRUE                                ~ "other"
+    type == "1Sg"                            ~ "1Sg",
+    grepl("^2Sg", type, ignore.case = TRUE)  ~ "2Sg",
+    grepl("^[0-9]+M", type)                  ~ "M",
+    grepl("^other_soft_clipped", type)       ~ "other_soft_clipped",
+    grepl("^other_mapped", type)             ~ "other_mapped",
+    TRUE                                     ~ "other_soft_clipped"
   )
 }
 
@@ -81,7 +84,7 @@ counts_agg <- counts_raw |>
 # join metadata
 counts_agg <- left_join(counts_agg, meta, by = "sample_id")
 
-cat_levels <- c("1Sg", "2Sg", "M", "other")
+cat_levels <- c("1Sg", "2Sg", "M", "other_soft_clipped", "other_mapped")
 counts_agg$category <- factor(counts_agg$category, levels = cat_levels)
 
 # ── per-sample histograms ─────────────────────────────────────────────────────
@@ -89,8 +92,11 @@ p_hist <- ggplot(counts_agg, aes(x = category, y = freq, fill = category)) +
   geom_col() +
   facet_wrap(~ sample_id, ncol = 3) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1), limits = c(0, 1)) +
-  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sg" = "#F39B7F",
-                                "M"   = "#4DBBD5", "other" = "#B2B2B2")) +
+  scale_fill_manual(values = c("1Sg"               = "#E64B35",
+                                "2Sg"               = "#F39B7F",
+                                "M"                 = "#4DBBD5",
+                                "other_soft_clipped" = "#B2B2B2",
+                                "other_mapped"       = "#7F7F7F")) +
   labs(title = "5' end type frequencies per sample",
        x = NULL, y = "Frequency", fill = NULL) +
   theme_bw(base_size = 11) +
