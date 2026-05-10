@@ -28,6 +28,7 @@ suppressPackageStartupMessages({
   library(dplyr)
   library(ggplot2)
   library(readr)
+  library(scales)
   library(yaml)
 })
 
@@ -271,6 +272,45 @@ if (length(results) > 0) {
   out_all <- file.path(outdir, "all_dinuc_proportions.tsv")
   write_tsv(combined, out_all)
   message("Combined TSV: ", out_all)
+
+  # ── combined grouped-bar plot ────────────────────────────────────────────────
+  dinuc_order <- combined |>
+    group_by(dinucleotide) |>
+    summarise(total = sum(proportion, na.rm = TRUE), .groups = "drop") |>
+    arrange(total) |>
+    pull(dinucleotide)
+
+  combined$dinucleotide <- factor(combined$dinucleotide, levels = dinuc_order)
+
+  n_samples <- length(unique(combined$sample))
+  pal <- if (n_samples <= 8) {
+    scales::hue_pal()(n_samples)
+  } else {
+    colorRampPalette(c("#4361ee", "#f72585", "#4cc9f0", "#7209b7",
+                       "#3a0ca3", "#f3722c", "#43aa8b", "#277da1"))(n_samples)
+  }
+
+  p_combined <- ggplot(combined,
+      aes(x = dinucleotide, y = proportion * 100, fill = sample)) +
+    geom_bar(stat = "identity", position = position_dodge(preserve = "single"),
+             colour = "grey30", linewidth = 0.15) +
+    scale_fill_manual(values = pal) +
+    xlab("Dinucleotide (CTSS ±1 bp)") +
+    ylab("% of total score") +
+    coord_flip() +
+    theme_bw(base_size = 10) +
+    theme(panel.grid.minor  = element_blank(),
+          legend.position   = "right",
+          legend.key.size   = unit(0.4, "cm"),
+          legend.text       = element_text(size = 7))
+
+  out_combined_pdf <- file.path(outdir, "all_dinuc_proportions_combined.pdf")
+  pdf(out_combined_pdf,
+      width  = 7,
+      height = max(4, length(dinuc_order) * 0.35 + 1.5))
+  print(p_combined)
+  dev.off()
+  message("Combined plot: ", out_combined_pdf)
 } else {
   message("No samples processed (check BAM paths and genome column in samples.tsv).")
 }
