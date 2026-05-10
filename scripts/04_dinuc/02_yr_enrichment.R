@@ -138,6 +138,9 @@ dn_heat <- dat |>
 
 for (et in c("1Sg", "2Sg", "all")) {
   df_et <- dn_heat |> filter(end_type == et)
+  dinuc_lvls <- sort(unique(df_et$dinucleotide))
+  df_et$dinucleotide <- factor(df_et$dinucleotide, levels = dinuc_lvls)
+  heat_label_colors <- ifelse(dinuc_lvls %in% YR, "#e63946", "black")
   p_heat <- ggplot(df_et, aes(x = condition, y = dinucleotide, fill = mean_prop)) +
     geom_tile(colour = "white") +
     geom_text(aes(label = sprintf("%.3f", mean_prop)), size = 2.5) +
@@ -145,7 +148,8 @@ for (et in c("1Sg", "2Sg", "all")) {
                         labels = scales::percent_format(accuracy = 0.1)) +
     labs(title = paste0("Dinucleotide proportions — ", et),
          x = NULL, y = "Dinucleotide", fill = "Proportion") +
-    theme_bw(base_size = 10)
+    theme_bw(base_size = 10) +
+    theme(axis.text.y = element_text(colour = heat_label_colors))
   ggsave(file.path(outdir, paste0("07_dinuc_heatmap_", et, ".pdf")),
          p_heat, width = 6, height = 5)
   message("Saved: 07_dinuc_heatmap_", et, ".pdf")
@@ -190,21 +194,29 @@ for (et in c("1Sg", "2Sg", "all")) {
     as.data.frame()
   ann_col <- ann_col[colnames(zscore_mat), , drop = FALSE]
 
+  ann_row <- data.frame(
+    canonical = ifelse(rownames(zscore_mat) %in% YR, "canonical", "other"),
+    row.names = rownames(zscore_mat)
+  )
+  ann_row_colors <- list(canonical = c(canonical = "#e63946", other = "grey80"))
+
   out_pdf <- file.path(outdir, paste0("07_dinuc_zscore_heatmap_", et, ".pdf"))
   pdf(out_pdf,
       width  = max(6, ncol(zscore_mat) * 0.45 + 2.5),
       height = max(4, nrow(zscore_mat) * 0.35 + 2))
   pheatmap(zscore_mat,
-           clustering_method       = hclust_method_dinuc,
+           clustering_method        = hclust_method_dinuc,
            clustering_distance_rows = dist_method_dinuc,
            clustering_distance_cols = dist_method_dinuc,
-           annotation_col          = ann_col,
-           color                   = colorRampPalette(c("#4DBBD5", "white", "#E64B35"))(100),
-           border_color            = NA,
-           fontsize                = 9,
-           main                    = paste0("Initiator dinucleotide z-scores — ", et,
-                                            "\n(distance: ", dist_method_dinuc,
-                                            ", linkage: ", hclust_method_dinuc, ")"))
+           annotation_col           = ann_col,
+           annotation_row           = ann_row,
+           annotation_colors        = ann_row_colors,
+           color                    = colorRampPalette(c("#4DBBD5", "white", "#E64B35"))(100),
+           border_color             = NA,
+           fontsize                 = 9,
+           main                     = paste0("Initiator dinucleotide z-scores — ", et,
+                                             "\n(distance: ", dist_method_dinuc,
+                                             ", linkage: ", hclust_method_dinuc, ")"))
   dev.off()
   message("Saved: ", basename(out_pdf))
 }

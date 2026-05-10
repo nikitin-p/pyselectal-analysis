@@ -216,14 +216,20 @@ process_sample <- function(sample_id, bam_path, genome_spec, outdir, force) {
 
   props$dinucleotide <- factor(props$dinucleotide, levels = props$dinucleotide)
 
-  p <- ggplot(props, aes(x = dinucleotide, y = proportion * 100)) +
-    geom_bar(stat = "identity", fill = "#4cc9f0", colour = "grey30", linewidth = 0.25) +
+  canonical <- c("CA", "CG", "TA", "TG")
+  props$is_canonical <- props$dinucleotide %in% canonical
+  label_colors <- ifelse(levels(props$dinucleotide) %in% canonical, "#e63946", "black")
+
+  p <- ggplot(props, aes(x = dinucleotide, y = proportion * 100, fill = is_canonical)) +
+    geom_bar(stat = "identity", colour = "grey30", linewidth = 0.25) +
+    scale_fill_manual(values = c("TRUE" = "#e63946", "FALSE" = "#4cc9f0"), guide = "none") +
     ggtitle(paste0("Initiator dinucleotide proportion\n", sample_id)) +
     xlab("Dinucleotide (CTSS ±1 bp)") +
     ylab("% of total score") +
     coord_flip() +
     theme_bw(base_size = 10) +
-    theme(panel.grid.minor = element_blank())
+    theme(panel.grid.minor  = element_blank(),
+          axis.text.y       = element_text(colour = label_colors))
 
   pdf(out_pdf, width = 5, height = max(3, nrow(props) * 0.25 + 1.5))
   print(p)
@@ -282,6 +288,9 @@ if (length(results) > 0) {
 
   combined$dinucleotide <- factor(combined$dinucleotide, levels = dinuc_order)
 
+  canonical_combined <- c("CA", "CG", "TA", "TG")
+  label_colors_combined <- ifelse(dinuc_order %in% canonical_combined, "#e63946", "black")
+
   n_samples <- length(unique(combined$sample))
   pal <- if (n_samples <= 8) {
     scales::hue_pal()(n_samples)
@@ -302,7 +311,8 @@ if (length(results) > 0) {
     theme(panel.grid.minor  = element_blank(),
           legend.position   = "right",
           legend.key.size   = unit(0.4, "cm"),
-          legend.text       = element_text(size = 7))
+          legend.text       = element_text(size = 7),
+          axis.text.y       = element_text(colour = label_colors_combined))
 
   out_combined_pdf <- file.path(outdir, "all_dinuc_proportions_combined.pdf")
   pdf(out_combined_pdf,

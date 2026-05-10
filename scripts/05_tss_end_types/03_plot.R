@@ -136,7 +136,9 @@ init_order <- box_dat |>
   group_by(initiator) |>
   summarise(med = median(pct, na.rm = TRUE), .groups = "drop") |>
   arrange(desc(med))
+canonical <- c("CA", "CG", "TA", "TG")
 box_dat$initiator <- factor(box_dat$initiator, levels = init_order$initiator)
+init_label_colors <- ifelse(init_order$initiator %in% canonical, "#e63946", "black")
 
 p_box <- ggplot(box_dat, aes(x = initiator, y = pct, fill = end_type)) +
   geom_boxplot(outlier.size = 0.4, outlier.alpha = 0.3, linewidth = 0.35) +
@@ -149,7 +151,7 @@ p_box <- ggplot(box_dat, aes(x = initiator, y = pct, fill = end_type)) +
   ) +
   theme_bw(base_size = 11) +
   theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1),
+    axis.text.x  = element_text(angle = 45, hjust = 1, colour = init_label_colors),
     panel.grid.minor = element_blank()
   )
 
@@ -186,7 +188,7 @@ p_stack <- ggplot(stack_dat, aes(x = initiator, y = pct, fill = end_type)) +
   ) +
   theme_bw(base_size = 11) +
   theme(
-    axis.text.x  = element_text(angle = 45, hjust = 1),
+    axis.text.x  = element_text(angle = 45, hjust = 1, colour = init_label_colors),
     panel.grid.minor = element_blank()
   )
 
