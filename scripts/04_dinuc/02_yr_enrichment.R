@@ -183,8 +183,8 @@ for (et in c("1Sg", "2Sg", "all")) {
     next
   }
 
-  # Z-score within each sample (column-wise): removes inter-sample depth differences
-  zscore_mat <- scale(count_mat)
+  # Z-score of log-transformed counts (column-wise): stabilizes variance and removes depth differences
+  zscore_mat <- scale(log10(count_mat + 1))
 
   # Column annotation: condition
   ann_col <- meta |>

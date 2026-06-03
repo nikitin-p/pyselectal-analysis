@@ -125,7 +125,7 @@ Raw pyselectal types are collapsed into four broad categories:
 The script produces the following outputs:
 
 - **Histogram** (`03_per_sample_histogram.pdf`): the category frequency is shown per sample in a faceted bar chart;
-- **Heatmap** (`03_replicate_heatmap.pdf`): a samples × categories matrix is clustered on both axes. The distance metric is Euclidean (pheatmap default) and the linkage is controlled by `replicate_hclust_method` in `params.yaml` (default: `complete`). Consistent replicates are expected to cluster together;
+- **Heatmap** (`03_replicate_heatmap.pdf`): a samples × categories matrix is clustered on both axes. Values are Z-scores of log10(count + 1), which stabilizes variance across categories with different count magnitudes. The distance metric is Euclidean (pheatmap default) and the linkage is controlled by `replicate_hclust_method` in `params.yaml` (default: `complete`). Consistent replicates are expected to cluster together;
 - **Chi-square** (`03_chisq_pairwise.tsv`): reads are pooled per condition and a pairwise chi-square test is applied to the count matrix, with BH-corrected p-values.
 
 ---
@@ -174,7 +174,7 @@ The script produces the following outputs:
 - **`07_yr_per_sample.pdf`** — a stacked bar chart showing YR / YC / other proportions per sample, faceted by end type (1Sg / 2Sg);
 - **`07_yr_by_condition.pdf`** — the mean ± SD YR proportion by condition, grouped by end type;
 - **`07_dinuc_heatmap_{1Sg,2Sg}.pdf`** — a tile heatmap of the mean proportion per dinucleotide × condition;
-- **`07_dinuc_zscore_heatmap_{1Sg,2Sg}.pdf`** — a hierarchical clustering heatmap where rows are initiator dinucleotides and columns are samples. The values are z-scores of alignment counts within each sample (column-wise scaling removes inter-sample depth differences). The distance metric is set by `dinuc_dist_method` (default: `euclidean`) and the linkage by `dinuc_hclust_method` (default: `ward.D2`);
+- **`07_dinuc_zscore_heatmap_{1Sg,2Sg}.pdf`** — a hierarchical clustering heatmap where rows are initiator dinucleotides and columns are samples. The values are Z-scores of log10(count + 1) within each sample (column-wise scaling stabilizes variance and removes inter-sample depth differences). The distance metric is set by `dinuc_dist_method` (default: `euclidean`) and the linkage by `dinuc_hclust_method` (default: `ward.D2`);
 - **`07_yr_chisq_pairwise.tsv`** — pairwise chi-square results for YR vs non-YR across conditions, BH-corrected, computed separately for each end type.
 
 ---

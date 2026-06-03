@@ -2,9 +2,9 @@
 # Stage 2: subsample BAMs to equal depth.
 # Usage: bash scripts/02_subsample/01_subsample.sh [--bam_dir DIR] [--out_dir DIR] [--force]
 #
-# 1. Count reads in every *_uniq.bam.
-# 2. Compute the median depth across all libraries.
-# 3. Exclude libraries whose depth < median * min_library_depth_fraction (from params.yaml).
+# 1. Count uniquely mapped reads (not alignments) in every *_uniq.bam.
+# 2. Compute Q1, Q3, IQR across all libraries.
+# 3. Exclude libraries whose depth < Q1 - 1.5×IQR (Tukey lower fence).
 # 4. Set target = floor(subsample_factor * min(retained depths)).
 # 5. Subsample each retained library to target using samtools view -s SEED.FRAC.
 #
@@ -42,7 +42,6 @@ SAMTOOLS=$(conda run -n "$CONDA_TOOLS" which samtools)
 
 SEED="$(yaml_get subsample_seed "$PARAMS")"
 FACTOR="$(yaml_get subsample_factor "$PARAMS")"
-MIN_FRAC="$(yaml_get min_library_depth_fraction "$PARAMS")"
 THREADS=4
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -57,28 +56,40 @@ log_info "Found ${#BAMS[@]} BAMs — counting reads..."
 declare -A COUNTS
 for BAM in "${BAMS[@]}"; do
     SAMPLE=$(basename "$BAM" _uniq.bam)
-    N=$($SAMTOOLS view -c "$BAM")
+    N=$($SAMTOOLS view -c -F 256 "$BAM")
     COUNTS[$SAMPLE]=$N
     log_info "  $SAMPLE: $N"
 done
 
-# ── compute median depth ───────────────────────────────────────────────────────
+# ── compute Q1, Q3, IQR and Tukey lower fence ──────────────────────────────────
 ALL_COUNTS=( "${COUNTS[@]}" )
-MEDIAN=$(printf '%s\n' "${ALL_COUNTS[@]}" | sort -n | awk '{a[NR]=$1}
+read -r Q1 Q3 IQR DEPTH_THRESHOLD < <(printf '%s\n' "${ALL_COUNTS[@]}" | sort -n | awk '
+    {a[NR]=$1}
     END{
         n=NR
-        if(n%2==1) print a[(n+1)/2]
-        else print int((a[n/2]+a[n/2+1])/2)
+        q1_pos = (n+1)*0.25
+        q3_pos = (n+1)*0.75
+        q1_lo = int(q1_pos); q1_hi = q1_lo + 1
+        q3_lo = int(q3_pos); q3_hi = q3_lo + 1
+        q1_frac = q1_pos - q1_lo
+        q3_frac = q3_pos - q3_lo
+        if (q1_hi > n) q1_hi = n
+        if (q3_hi > n) q3_hi = n
+        Q1 = a[q1_lo] + q1_frac * (a[q1_hi] - a[q1_lo])
+        Q3 = a[q3_lo] + q3_frac * (a[q3_hi] - a[q3_lo])
+        IQR = Q3 - Q1
+        threshold = Q1 - 1.5 * IQR
+        if (threshold < 0) threshold = 0
+        printf "%d %d %d %d\n", Q1, Q3, IQR, threshold
     }')
-DEPTH_THRESHOLD=$(echo "$MEDIAN $MIN_FRAC" | awk '{printf "%d", $1 * $2}')
-log_info "Median depth=$MEDIAN  min_fraction=$MIN_FRAC  exclusion threshold=$DEPTH_THRESHOLD"
+log_info "Q1=$Q1  Q3=$Q3  IQR=$IQR  Tukey lower fence (exclusion threshold)=$DEPTH_THRESHOLD"
 
 # ── filter low-coverage libraries ─────────────────────────────────────────────
 declare -A RETAINED
 for SAMPLE in "${!COUNTS[@]}"; do
     N=${COUNTS[$SAMPLE]}
     if (( N < DEPTH_THRESHOLD )); then
-        log_warn "EXCLUDED $SAMPLE: $N reads < threshold $DEPTH_THRESHOLD (< $MIN_FRAC × median $MEDIAN)"
+        log_warn "EXCLUDED $SAMPLE: $N reads < threshold $DEPTH_THRESHOLD (Q1 - 1.5×IQR)"
     else
         RETAINED[$SAMPLE]=$N
         log_info "RETAINED $SAMPLE: $N reads"

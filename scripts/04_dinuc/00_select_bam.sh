@@ -97,7 +97,7 @@ while IFS=$'\t' read -ra row; do
         else
             log_info "[$sid/$TYPE] selecting spec=$SPEC from $bam"
             conda run -n "$CONDA_ENV" python "$PYSELECTAL" \
-                -i "$bam" --select "$SPEC" -o "$OUT_BAM"
+                -i "$bam" --select "$SPEC" --no-name-sort -o "$OUT_BAM"
             $SAMTOOLS index "$OUT_BAM"
             log_info "[$sid/$TYPE] done → $OUT_BAM"
         fi

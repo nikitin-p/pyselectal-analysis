@@ -89,6 +89,7 @@ while IFS=$'\t' read -ra row; do
             -i "$bam" -c \
             --collapse-threshold "$COLLAPSE" \
             --mapped-prefix "$MAPPED_PFX" \
+            --no-name-sort \
             -o "$out" \
             2>>"$log"; then
         log_info "[$sid] done → $out"

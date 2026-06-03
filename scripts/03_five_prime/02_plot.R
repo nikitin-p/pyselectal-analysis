@@ -107,15 +107,18 @@ ggsave(file.path(outdir, "03_per_sample_histogram.pdf"),
        p_hist, width = 10, height = 6)
 message("Saved: 03_per_sample_histogram.pdf")
 
-# ── heatmap of frequencies: samples × categories ─────────────────────────────
-freq_mat <- counts_agg |>
-  select(sample_id, category, freq) |>
-  pivot_wider(names_from = category, values_from = freq, values_fill = 0) |>
+# ── heatmap of Z-scores: samples × categories ────────────────────────────────
+count_mat <- counts_agg |>
+  select(sample_id, category, count) |>
+  pivot_wider(names_from = category, values_from = count, values_fill = 0) |>
   column_to_rownames("sample_id") |>
   as.matrix()
 
 # keep only categories with any variation
-freq_mat <- freq_mat[, apply(freq_mat, 2, sd) > 0, drop = FALSE]
+count_mat <- count_mat[, apply(count_mat, 2, sd) > 0, drop = FALSE]
+
+# Z-score of log-transformed counts (column-wise): stabilizes variance
+zscore_mat <- scale(log10(count_mat + 1))
 
 # annotation rows: condition + replicate (if columns exist)
 ann_row <- NULL
@@ -124,19 +127,19 @@ if ("condition" %in% colnames(meta)) {
     select(sample_id, any_of(c("condition", "replicate"))) |>
     column_to_rownames("sample_id") |>
     as.data.frame()
-  ann_row <- ann_row[rownames(freq_mat), , drop = FALSE]
+  ann_row <- ann_row[rownames(zscore_mat), , drop = FALSE]
 }
 
-pdf(file.path(outdir, "03_replicate_heatmap.pdf"), width = 6, height = max(4, nrow(freq_mat) * 0.5 + 2))
-pheatmap(freq_mat,
+pdf(file.path(outdir, "03_replicate_heatmap.pdf"), width = 6, height = max(4, nrow(zscore_mat) * 0.5 + 2))
+pheatmap(zscore_mat,
          clustering_method = hclust_method,
          annotation_row    = ann_row,
-         color             = colorRampPalette(c("#FFFFFF", "#E64B35"))(100),
+         color             = colorRampPalette(c("#313695", "#FFFFFF", "#E64B35"))(100),
          border_color      = NA,
          display_numbers   = TRUE,
          number_format     = "%.2f",
          fontsize          = 9,
-         main              = "5' end type frequencies — replicate reproducibility")
+         main              = "5' end type Z-scores — replicate reproducibility")
 dev.off()
 message("Saved: 03_replicate_heatmap.pdf")
 
