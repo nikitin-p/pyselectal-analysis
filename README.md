@@ -27,6 +27,8 @@ This is a computational framework for analyzing CAGE and NET-CAGE datasets to ch
 
 | Env | Purpose |
 | --- | --- |
+| `star` | STAR aligner |
+| `tools` | samtools and other CLI tools |
 | `pysam` | pyselectal (BAM filtering and counting) |
 | `r_cage` | R + Bioconductor (all analysis scripts) |
 
@@ -79,10 +81,10 @@ Key STAR flags:
 
 The script performs the following steps:
 
-1. The read count of every library is obtained with `samtools view -c`;
-2. The **median** depth is computed across all libraries;
-3. Any library with depth below `median × min_library_depth_fraction` (default 0.5) is **excluded** — excluded libraries are logged and dropped from all downstream analysis;
-4. The subsampling target is set as `floor(subsample_factor × min(retained depths))` (default factor 0.9);
+1. The read count of every library is obtained with `samtools view -c -F 256` (counting reads, not alignments);
+2. The Q1, Q3, and IQR are computed across all libraries;
+3. Any library with depth below the Tukey lower fence (Q1 − 1.5×IQR) is **excluded** — excluded libraries are logged and dropped from all downstream analysis;
+4. The subsampling target is set as `floor(subsample_factor × min(retained depths))` (default factor 0.95);
 5. Each retained library is subsampled with `samtools view -s SEED.FRAC` (seed 42).
 
 For the yeast dataset, all 8 libraries were retained and the target was 2,190,922 reads.
@@ -197,18 +199,27 @@ TSS are clustered hierarchically by their mean end-type vector using Euclidean d
 
 ---
 
-### Stage 10 — CAGEr promoter clusters + gene-type enrichment (planned)
+### Stage 10 — CAGEr promoter clusters + gene-type enrichment (scripted)
 
+**Scripts:** `scripts/06_cager/run.sh`  
 **Output:** `results/cager/`
 
-A fresh CAGEr run is planned: `filterLowExpCTSS` (TPM ≥ 1), `distclu` (maxDist 20, keepSingletonsAbove 5), IQW calculation, and gene-type enrichment analysis among coding and noncoding subclasses.
+The scripts perform a fresh CAGEr run: `filterLowExpCTSS` (TPM ≥ 1), `distclu` (maxDist 20, keepSingletonsAbove 5), IQW calculation, and gene-type enrichment analysis among coding and noncoding subclasses.
 
 ---
 
-### Stages 11–12 (planned)
+### Stage 11 — Expression dynamics (scripted)
 
-- **Stage 11** — Expression dynamics of TSS clusters with ≥ `expr_min_pct_1Sg` % 1Sg reads are tracked across all conditions;
-- **Stage 12** — The distribution of reads in repetitive vs unique regions is characterized; TLDR-seq observed-vs-expected 5′ ends are compared.
+**Scripts:** `scripts/06_expression/run.sh`  
+**Output:** `results/expression/`
+
+Expression dynamics of TSS clusters with ≥ `expr_min_pct_1Sg` % 1Sg reads are tracked across all conditions.
+
+---
+
+### Stage 12 (planned)
+
+The distribution of reads in repetitive vs unique regions is characterized; TLDR-seq observed-vs-expected 5′ ends are compared.
 
 ---
 
@@ -229,9 +240,12 @@ results/
   dinuc/                dinucleotide proportions (all reads)
   dinuc_1Sg/            dinucleotide proportions (1Sg reads only)
   dinuc_2Sg/            dinucleotide proportions (2Sg reads only)
+  dinuc_all/            dinucleotide proportions merged across all samples
   tss/                  typed_ctss.tsv.gz, tss_matrix.tsv, tss_clustered.tsv, tss_hclust.rds
-  cager/                (planned) CAGEr promoter clusters
-  annotation/           (planned) ChIPseeker output
+  cager/                CAGEr promoter clusters
+  cageseq/              CAGEr SE objects
+  annotation/           ChIPseeker output
+  expression/           (Stage 11) TSS cluster expression dynamics
   figures/              all PDFs and TSVs from analysis scripts
 scripts/
   00_setup/             test BAM generation
@@ -240,6 +254,7 @@ scripts/
   03_five_prime/        5′-end counting, plotting, soft-clip composition
   04_dinuc/             BAM selection, dinucleotide profiling, YR enrichment
   05_tss_end_types/     CIGAR-based read classification, distclu clustering, annotation, figures
+  06_cager/             (scripted) CAGEr promoter clusters, gene-type enrichment
   06_expression/        (planned) TSS cluster expression dynamics
   99_additional/        (planned) repeats, TLDR-seq
   utils/                log.sh, parse_yaml.sh
@@ -254,8 +269,7 @@ test/                   synthetic BAMs and reference for pipeline testing
 | --- | --- | --- |
 | `collapse_threshold` | 0.1 | pyselectal: collapse types < 0.1 % into `other` |
 | `mapped_prefix` | 5 | pyselectal: bases shown for M-type labels |
-| `subsample_factor` | 0.9 | target = 0.9 × min(retained library depths) |
-| `min_library_depth_fraction` | 0.5 | exclude libraries with < 50 % of median depth |
+| `subsample_factor` | 0.95 | target = 0.95 × min(retained library depths) |
 | `subsample_seed` | 42 | random seed for samtools subsampling |
 | `replicate_hclust_method` | complete | linkage for Stage 4 replicate heatmap |
 | `dinuc_hclust_method` | ward.D2 | linkage for Stage 7 dinucleotide z-score heatmap |
