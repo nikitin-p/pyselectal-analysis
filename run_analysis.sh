@@ -2,7 +2,11 @@
 # Top-level runner: stages 1–9 (mapping → dinucleotides → TSS matrix).
 #
 # Usage:
-#   bash run_analysis.sh [--force]
+#   bash run_analysis.sh [--force] [--skip-mapping]
+#
+# Options:
+#   --force         Re-run stages even if outputs exist
+#   --skip-mapping  Skip stage 1 (STAR mapping); useful when BAMs already exist
 #
 # Prerequisites:
 #   - FASTQ paths filled in config/samples.tsv
@@ -16,7 +20,14 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-[[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
+SKIP_MAPPING=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --force) FORCE_FLAG="--force" ;;
+        --skip-mapping) SKIP_MAPPING=true ;;
+    esac
+done
 
 CONDA_R="$(yaml_get conda_env_r "$PARAMS")"
 RSCRIPT=$(conda run -n "$CONDA_R" which Rscript)
@@ -25,10 +36,14 @@ BAM_SUB="$ROOT_DIR/results/bam_subsampled"
 BAM_SEL="$ROOT_DIR/results/bam_selected"
 
 # ── Stage 1: STAR mapping ─────────────────────────────────────────────────────
-log_info "Stage 1: STAR mapping"
-bash "$ROOT_DIR/scripts/01_map/01_map.sh" \
-    --samples "$SAMPLES" \
-    $FORCE_FLAG
+if [[ "$SKIP_MAPPING" == true ]]; then
+    log_info "Stage 1: STAR mapping — SKIPPED (--skip-mapping)"
+else
+    log_info "Stage 1: STAR mapping"
+    bash "$ROOT_DIR/scripts/01_map/01_map.sh" \
+        --samples "$SAMPLES" \
+        $FORCE_FLAG
+fi
 
 # ── Stage 2: subsampling ──────────────────────────────────────────────────────
 log_info "Stage 2: subsampling to equal depth"
