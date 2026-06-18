@@ -214,7 +214,7 @@ for (et in c("1Sg", "2Sg", "all")) {
            color                    = colorRampPalette(c("#4DBBD5", "white", "#E64B35"))(100),
            border_color             = NA,
            fontsize                 = 9,
-           main                     = paste0("Initiator dinucleotide z-scores — ", et,
+           main                     = paste0("Initiator dinucleotide z-scores (column-wise) — ", et,
                                              "\n(distance: ", dist_method_dinuc,
                                              ", linkage: ", hclust_method_dinuc, ")"))
   dev.off()

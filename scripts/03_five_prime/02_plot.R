@@ -117,8 +117,8 @@ count_mat <- counts_agg |>
 # keep only categories with any variation
 count_mat <- count_mat[, apply(count_mat, 2, sd) > 0, drop = FALSE]
 
-# Z-score of log-transformed counts (column-wise): stabilizes variance
-zscore_mat <- scale(log10(count_mat + 1))
+# Z-score of log-transformed counts (row-wise): each sample normalized independently
+zscore_mat <- t(scale(t(log10(count_mat + 1))))
 
 # annotation rows: condition + replicate (if columns exist)
 ann_row <- NULL
@@ -139,7 +139,7 @@ pheatmap(zscore_mat,
          display_numbers   = TRUE,
          number_format     = "%.2f",
          fontsize          = 9,
-         main              = "5' end type Z-scores — replicate reproducibility")
+         main              = "5' end type Z-scores (row-wise) — replicate reproducibility")
 dev.off()
 message("Saved: 03_replicate_heatmap.pdf")
 
