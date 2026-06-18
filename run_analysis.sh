@@ -73,7 +73,7 @@ $RSCRIPT "$ROOT_DIR/scripts/03_five_prime/03_softclip_composition.R" \
     --params     "$PARAMS"
 
 # ── Stage 6a: select per-type BAMs ───────────────────────────────────────────
-log_info "Stage 6a: select 1Sg and 2Sg BAMs"
+log_info "Stage 6a: select 1Sg, 2Sgg, and 3Sggg BAMs"
 bash "$ROOT_DIR/scripts/04_dinuc/00_select_bam.sh" \
     --bam_dir "$BAM_SUB" \
     $FORCE_FLAG
@@ -86,16 +86,24 @@ bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
     --outdir  "$ROOT_DIR/results/dinuc_1Sg" \
     $FORCE_FLAG
 
-# ── Stage 6c: dinucleotide proportions (2Sg) ─────────────────────────────────
-log_info "Stage 6c: dinucleotide proportions — 2Sg"
+# ── Stage 6c: dinucleotide proportions (2Sgg) ────────────────────────────────
+log_info "Stage 6c: dinucleotide proportions — 2Sgg"
 bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
     --bam_dir "$BAM_SEL" \
-    --samples "$ROOT_DIR/config/samples_2Sg.tsv" \
-    --outdir  "$ROOT_DIR/results/dinuc_2Sg" \
+    --samples "$ROOT_DIR/config/samples_2Sgg.tsv" \
+    --outdir  "$ROOT_DIR/results/dinuc_2Sgg" \
     $FORCE_FLAG
 
-# ── Stage 6d: dinucleotide proportions (all reads — unfiltered subsampled BAMs)
-log_info "Stage 6d: dinucleotide proportions — all reads"
+# ── Stage 6d: dinucleotide proportions (3Sggg) ───────────────────────────────
+log_info "Stage 6d: dinucleotide proportions — 3Sggg"
+bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
+    --bam_dir "$BAM_SEL" \
+    --samples "$ROOT_DIR/config/samples_3Sggg.tsv" \
+    --outdir  "$ROOT_DIR/results/dinuc_3Sggg" \
+    $FORCE_FLAG
+
+# ── Stage 6e: dinucleotide proportions (all reads — unfiltered subsampled BAMs)
+log_info "Stage 6e: dinucleotide proportions — all reads"
 bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
     --bam_dir "$BAM_SUB" \
     --samples "$SAMPLES" \
@@ -105,7 +113,10 @@ bash "$ROOT_DIR/scripts/04_dinuc/run.sh" \
 # ── Stage 7: YR/YC enrichment ────────────────────────────────────────────────
 log_info "Stage 7: YR/YC enrichment"
 $RSCRIPT "$ROOT_DIR/scripts/04_dinuc/02_yr_enrichment.R" \
-    --dinuc_all "$ROOT_DIR/results/dinuc_all/all_dinuc_proportions.tsv" \
+    --dinuc_1sg   "$ROOT_DIR/results/dinuc_1Sg/all_dinuc_proportions.tsv" \
+    --dinuc_2sgg  "$ROOT_DIR/results/dinuc_2Sgg/all_dinuc_proportions.tsv" \
+    --dinuc_3sggg "$ROOT_DIR/results/dinuc_3Sggg/all_dinuc_proportions.tsv" \
+    --dinuc_all   "$ROOT_DIR/results/dinuc_all/all_dinuc_proportions.tsv" \
     --samples "$SAMPLES" \
     --outdir  "$ROOT_DIR/results/figures" \
     --params  "$PARAMS"

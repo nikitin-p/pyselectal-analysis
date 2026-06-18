@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Stage 8 step 1: classify every read in each subsampled BAM by 5'-end type
-# (1Sg / 2Sg / M / other) and aggregate to a per-position per-sample typed CTSS table.
+# (1Sg / 2Sgg / M / other) and aggregate to a per-position per-sample typed CTSS table.
 #
 # Classification is strand-aware using CIGAR + sequence:
 #   + strand: 5' soft clip = start of CIGAR; first stored base checked for G
@@ -117,7 +117,7 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
   type <- character(length(ga))
   type[clen == 0]                   <- "M"
   type[clen == 1 & first_g]         <- "1Sg"
-  type[clen == 2 & first_g]         <- "2Sg"
+  type[clen == 2 & first_g]         <- "2Sgg"
   type[type == ""]                  <- "other"
 
   # Aggregate: (chr, pos, strand, type) → count
@@ -135,13 +135,13 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
   wide <- dcast(agg, chr + pos + strand ~ type, value.var = "n", fill = 0L)
 
   # Ensure all type columns present
-  for (col in c("1Sg", "2Sg", "M", "other")) {
+  for (col in c("1Sg", "2Sgg", "M", "other")) {
     if (!col %in% colnames(wide)) wide[[col]] <- 0L
   }
 
-  wide[, n_total := `1Sg` + `2Sg` + M + other]
-  setnames(wide, c("1Sg", "2Sg", "M", "other"),
-           c("n_1Sg", "n_2Sg", "n_M", "n_other"))
+  wide[, n_total := `1Sg` + `2Sgg` + M + other]
+  setnames(wide, c("1Sg", "2Sgg", "M", "other"),
+           c("n_1Sg", "n_2Sgg", "n_M", "n_other"))
   wide[, sample_id := sample_id]
 
   wide

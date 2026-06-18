@@ -2,7 +2,7 @@
 # Stage 9 step 1: hierarchical clustering of TSS by end-type vector +
 # strand-aware BED annotation (overlap → sense/antisense genic; else intergenic).
 #
-# Clustering: average pct_1Sg/2Sg/M/other across all samples per TSS →
+# Clustering: average pct_1Sg/2Sgg/M/other across all samples per TSS →
 # Euclidean distance → Ward.D2 linkage → cut at --k_clusters (default 6).
 #
 # Annotation: for each dominant TSS position, intersect with the gene annotation
@@ -83,7 +83,7 @@ message("  clusters with >= ", min_samples, " samples: ", length(keep_ids))
 # Average pct values across all samples (ignoring NA / zero-coverage)
 avg <- mat_f[n_total > 0, .(
   mean_pct_1Sg   = mean(pct_1Sg,   na.rm = TRUE),
-  mean_pct_2Sg   = mean(pct_2Sg,   na.rm = TRUE),
+  mean_pct_2Sgg   = mean(pct_2Sgg,   na.rm = TRUE),
   mean_pct_M     = mean(pct_M,     na.rm = TRUE),
   mean_pct_other = mean(pct_other, na.rm = TRUE),
   mean_total     = mean(n_total,   na.rm = TRUE)
@@ -91,7 +91,7 @@ avg <- mat_f[n_total > 0, .(
 
 # ── hierarchical clustering ───────────────────────────────────────────────────
 # Euclidean distance on 4-component end-type vector; Ward.D2 linkage.
-feat_cols <- c("mean_pct_1Sg", "mean_pct_2Sg", "mean_pct_M", "mean_pct_other")
+feat_cols <- c("mean_pct_1Sg", "mean_pct_2Sgg", "mean_pct_M", "mean_pct_other")
 feat_mat  <- as.matrix(avg[, ..feat_cols])
 rownames(feat_mat) <- avg$cluster_id
 

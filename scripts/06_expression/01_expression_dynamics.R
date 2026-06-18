@@ -82,7 +82,7 @@ meta <- read_tsv(samples_f, comment = "#", col_types = cols(.default = "c"),
 # Cluster-level mean end-type fractions (from stage 9 tss_clustered.tsv)
 clus_feat <- clus[, .(cluster_id, chr, tss_pos, strand, initiator,
                        hclust_group, annotation,
-                       mean_pct_1Sg, mean_pct_2Sg, mean_pct_M, mean_pct_other)]
+                       mean_pct_1Sg, mean_pct_2Sgg, mean_pct_M, mean_pct_other)]
 
 # ── classify clusters ─────────────────────────────────────────────────────────
 clus_feat[, cluster_class := ifelse(
@@ -119,7 +119,7 @@ mat_ann <- mat_ann[!is.na(cluster_class)]
 cond_agg <- mat_ann[, .(
   mean_n_total = mean(n_total, na.rm = TRUE),
   mean_pct_1Sg = mean(pct_1Sg, na.rm = TRUE),
-  mean_pct_2Sg = mean(pct_2Sg, na.rm = TRUE),
+  mean_pct_2Sgg = mean(pct_2Sgg, na.rm = TRUE),
   mean_pct_M   = mean(pct_M,   na.rm = TRUE),
   mean_pct_other = mean(pct_other, na.rm = TRUE)
 ), by = .(cluster_id, condition, cluster_class)]
@@ -164,19 +164,19 @@ message("  end-type by condition: ", out_type)
 high_cond <- cond_agg[cluster_class != "other"] |>
   as.data.frame() |>
   pivot_longer(
-    cols      = c(mean_pct_1Sg, mean_pct_2Sg, mean_pct_M, mean_pct_other),
+    cols      = c(mean_pct_1Sg, mean_pct_2Sgg, mean_pct_M, mean_pct_other),
     names_to  = "end_type",
     values_to = "pct"
   ) |>
   mutate(end_type = recode(end_type,
     mean_pct_1Sg   = "1Sg",
-    mean_pct_2Sg   = "2Sg",
+    mean_pct_2Sgg   = "2Sgg",
     mean_pct_M     = "M",
     mean_pct_other = "other"
   )) |>
-  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sg", "M", "other")))
+  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sgg", "M", "other")))
 
-type_colors <- c("1Sg" = "#4361ee", "2Sg" = "#f72585",
+type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585",
                  "M"   = "#06d6a0", "other" = "#adb5bd")
 
 p_type <- ggplot(high_cond, aes(x = condition, y = pct, fill = end_type)) +

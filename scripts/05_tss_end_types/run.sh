@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Stage 8: TSS × end-type matrix — per-cluster 1Sg/2Sg/M/other fractions
+# Stage 8: TSS × end-type matrix — per-cluster 1Sg/2Sgg/M/other fractions
 # annotated with initiator dinucleotide.
 #
 # Steps:

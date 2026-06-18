@@ -1,6 +1,6 @@
 # pyselectal-analysis
 
-This is a computational framework for analyzing CAGE and NET-CAGE datasets to characterize 5′-end diversity at transcription start sites (TSS): soft-clip patterns (1Sg / 2Sg / M / other), initiator dinucleotide usage, and their dynamics across conditions and subcellular fractions.
+This is a computational framework for analyzing CAGE and NET-CAGE datasets to characterize 5′-end diversity at transcription start sites (TSS): soft-clip patterns (1Sg / 2Sgg / M / other), initiator dinucleotide usage, and their dynamics across conditions and subcellular fractions.
 
 ---
 
@@ -39,15 +39,17 @@ This is a computational framework for analyzing CAGE and NET-CAGE datasets to ch
 All parameters are stored in `config/params.yaml`; sample metadata is stored in `config/samples.tsv`. There are no hardcoded paths outside those files.
 
 ```bash
-# Run from project root
-bash scripts/02_subsample/01_subsample.sh
-bash scripts/03_five_prime/01_count.sh
-conda run -n r_cage Rscript scripts/03_five_prime/02_plot.R
-conda run -n r_cage Rscript scripts/03_five_prime/03_softclip_composition.R
-bash scripts/04_dinuc/run.sh
+# Full pipeline (stages 1–9): mapping through TSS clustering
+bash run_analysis.sh
+
+# Skip mapping if BAMs already exist in results/bam/
+bash run_analysis.sh --skip-mapping
+
+# Force re-run even if outputs exist
+bash run_analysis.sh --skip-mapping --force
 ```
 
-The flag `--force` can be added to any bash script to rerun it even if the outputs already exist.
+The `--force` flag can be added to any individual stage script as well.
 
 ---
 
@@ -99,7 +101,7 @@ For the yeast dataset, all 8 libraries were retained and the target was 2,190,92
 **Input:** The subsampled BAM files listed in the `bam` column of `config/samples.tsv`.  
 **Output:** The per-sample count tables are written to `results/five_prime/{sample}_counts.tsv`.
 
-pyselectal inspects the CIGAR string and the first soft-clipped base of each read and outputs `type\tcount` rows sorted by descending count. Types include `1Sg`, `2Sgg`, `2Sgc`, `36Mctcac`, etc.
+pyselectal inspects the CIGAR string and the first soft-clipped base of each read and outputs `type\tcount` rows sorted by descending count. Types include `1Sg`, `2Sggg`, `2Sggc`, `36Mctcac`, etc.
 
 Key parameters from `params.yaml`:
 
@@ -120,7 +122,7 @@ Raw pyselectal types are collapsed into four broad categories:
 | Category | Rule |
 | --- | --- |
 | `1Sg` | exactly one soft-clipped G |
-| `2Sg` | two soft-clipped bases, first is G |
+| `2Sgg` | two soft-clipped bases, first is G |
 | `M` | no 5′ soft-clip (mapped start) |
 | `other` | all remaining soft-clips |
 
@@ -148,9 +150,9 @@ The nucleotide composition of non-1Sg soft-clipped bases is compared against lit
 **Scripts:** `scripts/04_dinuc/00_select_bam.sh`, `scripts/04_dinuc/run.sh` (calls `01_dinuc_proportion.R`)  
 **Status:** The analysis is complete for the yeast dataset.  
 **Input:** `results/bam_subsampled/`  
-**Output:** The type-filtered BAMs are written to `results/bam_selected/{sample}_1Sg.bam` and `{sample}_2Sg.bam`; the dinucleotide tables are written to `results/dinuc_1Sg/` and `results/dinuc_2Sg/`.
+**Output:** The type-filtered BAMs are written to `results/bam_selected/{sample}_1Sg.bam` and `{sample}_2Sgg.bam`; the dinucleotide tables are written to `results/dinuc_1Sg/` and `results/dinuc_2Sgg/`.
 
-pyselectal `--select` is used to filter each BAM to reads matching the 1Sg or 2Sg pattern. The script `01_dinuc_proportion.R` then extracts the 5′ CTSS position of each read, queries a 2-bp window centred on the CTSS (strand-aware, CTSS ±1 bp), and computes raw-count-weighted dinucleotide proportions.
+pyselectal `--select` is used to filter each BAM to reads matching the 1Sg or 2Sgg pattern. The script `01_dinuc_proportion.R` then extracts the 5′ CTSS position of each read, queries a 2-bp window centred on the CTSS (strand-aware, CTSS ±1 bp), and computes raw-count-weighted dinucleotide proportions.
 
 The genome is specified via the `genome` column in `samples.tsv` as either a BSgenome alias (`sacCer3`, `hg38`) or a path to a FASTA file for custom assemblies.
 
@@ -162,7 +164,7 @@ Per-sample outputs are `{sample}_dinuc_proportion.tsv` and `{sample}_dinuc_propo
 
 **Script:** `scripts/04_dinuc/02_yr_enrichment.R`  
 **Status:** The analysis is complete for the yeast dataset.  
-**Input:** `results/dinuc_1Sg/all_dinuc_proportions.tsv`, `results/dinuc_2Sg/all_dinuc_proportions.tsv`  
+**Input:** `results/dinuc_1Sg/all_dinuc_proportions.tsv`, `results/dinuc_2Sgg/all_dinuc_proportions.tsv`  
 **Output:** The figures and tables are written to `results/figures/`: `07_yr_*.pdf`, `07_yr_chisq_pairwise.tsv`.
 
 Dinucleotides are classified into three categories:
@@ -173,10 +175,10 @@ Dinucleotides are classified into three categories:
 
 The script produces the following outputs:
 
-- **`07_yr_per_sample.pdf`** — a stacked bar chart showing YR / YC / other proportions per sample, faceted by end type (1Sg / 2Sg);
+- **`07_yr_per_sample.pdf`** — a stacked bar chart showing YR / YC / other proportions per sample, faceted by end type (1Sg / 2Sgg);
 - **`07_yr_by_condition.pdf`** — the mean ± SD YR proportion by condition, grouped by end type;
-- **`07_dinuc_heatmap_{1Sg,2Sg}.pdf`** — a tile heatmap of the mean proportion per dinucleotide × condition;
-- **`07_dinuc_zscore_heatmap_{1Sg,2Sg}.pdf`** — a hierarchical clustering heatmap where rows are initiator dinucleotides and columns are samples. The values are Z-scores of log10(count + 1) within each sample (column-wise scaling stabilizes variance and removes inter-sample depth differences). The distance metric is set by `dinuc_dist_method` (default: `euclidean`) and the linkage by `dinuc_hclust_method` (default: `ward.D2`);
+- **`07_dinuc_heatmap_{1Sg,2Sgg}.pdf`** — a tile heatmap of the mean proportion per dinucleotide × condition;
+- **`07_dinuc_zscore_heatmap_{1Sg,2Sgg}.pdf`** — a hierarchical clustering heatmap where rows are initiator dinucleotides and columns are samples. The values are Z-scores of log10(count + 1) within each sample (column-wise scaling stabilizes variance and removes inter-sample depth differences). The distance metric is set by `dinuc_dist_method` (default: `euclidean`) and the linkage by `dinuc_hclust_method` (default: `ward.D2`);
 - **`07_yr_chisq_pairwise.tsv`** — pairwise chi-square results for YR vs non-YR across conditions, BH-corrected, computed separately for each end type.
 
 ---
@@ -229,17 +231,17 @@ The distribution of reads in repetitive vs unique regions is characterized; TLDR
 config/
   samples.tsv           all samples (bam column points to subsampled BAMs)
   samples_1Sg.tsv       generated by 00_select_bam.sh — 1Sg-filtered BAMs
-  samples_2Sg.tsv       generated by 00_select_bam.sh — 2Sg-filtered BAMs
+  samples_2Sgg.tsv       generated by 00_select_bam.sh — 2Sgg-filtered BAMs
   params.yaml           all pipeline parameters and conda env names
 data/                   raw FASTQ (per-dataset subdirs or symlinks)
 results/
   bam/                  STAR output, MAPQ-filtered
   bam_subsampled/       depth-equalised BAMs (*_sub.bam)
-  bam_selected/         type-filtered BAMs (*_1Sg.bam, *_2Sg.bam)
+  bam_selected/         type-filtered BAMs (*_1Sg.bam, *_2Sgg.bam)
   five_prime/           pyselectal count TSVs per sample
   dinuc/                dinucleotide proportions (all reads)
   dinuc_1Sg/            dinucleotide proportions (1Sg reads only)
-  dinuc_2Sg/            dinucleotide proportions (2Sg reads only)
+  dinuc_2Sgg/            dinucleotide proportions (2Sgg reads only)
   dinuc_all/            dinucleotide proportions merged across all samples
   tss/                  typed_ctss.tsv.gz, tss_matrix.tsv, tss_clustered.tsv, tss_hclust.rds
   cager/                CAGEr promoter clusters

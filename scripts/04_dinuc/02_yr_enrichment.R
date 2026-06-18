@@ -4,7 +4,7 @@
 # Usage (from project root):
 #   Rscript scripts/04_dinuc/02_yr_enrichment.R \
 #       --dinuc_1sg   results/dinuc_1Sg/all_dinuc_proportions.tsv \
-#       --dinuc_2sg   results/dinuc_2Sg/all_dinuc_proportions.tsv \
+#       --dinuc_2sg   results/dinuc_2Sgg/all_dinuc_proportions.tsv \
 #       --dinuc_3sggg results/dinuc_3Sggg/all_dinuc_proportions.tsv \
 #       --dinuc_all   results/dinuc_all/all_dinuc_proportions.tsv \
 #       --samples     config/samples.tsv \
@@ -31,7 +31,7 @@ get_arg <- function(flag, default = NULL) {
 }
 
 dinuc_1sg   <- get_arg("--dinuc_1sg",   "results/dinuc_1Sg/all_dinuc_proportions.tsv")
-dinuc_2sg   <- get_arg("--dinuc_2sg",   "results/dinuc_2Sg/all_dinuc_proportions.tsv")
+dinuc_2sg   <- get_arg("--dinuc_2sg",   "results/dinuc_2Sgg/all_dinuc_proportions.tsv")
 dinuc_3sggg <- get_arg("--dinuc_3sggg", "results/dinuc_3Sggg/all_dinuc_proportions.tsv")
 dinuc_all   <- get_arg("--dinuc_all",   "results/dinuc_all/all_dinuc_proportions.tsv")
 samples_f <- get_arg("--samples",   "config/samples.tsv")
@@ -70,7 +70,7 @@ load_dinuc <- function(path, type_label) {
 }
 
 d1 <- load_dinuc(dinuc_1sg, "1Sg")
-d2 <- load_dinuc(dinuc_2sg, "2Sg")
+d2 <- load_dinuc(dinuc_2sg, "2Sgg")
 d3 <- load_dinuc(dinuc_3sggg, "3Sggg")
 dall <- load_dinuc(dinuc_all, "all")
 dat <- bind_rows(d1, d2, d3, dall) |>
@@ -104,7 +104,7 @@ p_bar <- ggplot(sample_cat,
 ggsave(file.path(outdir, "07_yr_per_sample.pdf"), p_bar, width = 10, height = 7)
 message("Saved: 07_yr_per_sample.pdf")
 
-# ── Figure 2: YR proportion across conditions, 1Sg vs 2Sg ─────────────────────
+# ── Figure 2: YR proportion across conditions, 1Sg vs 2Sgg ─────────────────────
 yr_cond <- sample_cat |>
   filter(category == "YR") |>
   group_by(end_type, condition) |>
@@ -121,7 +121,7 @@ p_cond <- ggplot(yr_cond,
                 position = position_dodge(0.7), width = 0.2) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                      limits = c(0, 1)) +
-  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sg" = "#F39B7F",
+  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sgg" = "#F39B7F",
                                 "3Sggg" = "#F5B041", "all" = "#4DBBD5")) +
   labs(title = "YR proportion by condition",
        x = NULL, y = "YR proportion (mean ± SD across replicates)",
@@ -139,7 +139,7 @@ dn_heat <- dat |>
   summarise(mean_prop = mean(proportion), .groups = "drop") |>
   mutate(label = paste0(end_type, "\n", condition))
 
-for (et in c("1Sg", "2Sg", "3Sggg", "all")) {
+for (et in c("1Sg", "2Sgg", "3Sggg", "all")) {
   df_et <- dn_heat |> filter(end_type == et)
   dinuc_lvls <- sort(unique(df_et$dinucleotide))
   df_et$dinucleotide <- factor(df_et$dinucleotide, levels = dinuc_lvls)
@@ -167,7 +167,7 @@ for (et in c("1Sg", "2Sg", "3Sggg", "all")) {
 hclust_method_dinuc <- params$dinuc_hclust_method %||% "ward.D2"
 dist_method_dinuc   <- params$dinuc_dist_method   %||% "euclidean"
 
-for (et in c("1Sg", "2Sg", "3Sggg", "all")) {
+for (et in c("1Sg", "2Sgg", "3Sggg", "all")) {
   df_et <- dat |>
     filter(end_type == et) |>
     select(sample_id, dinucleotide, sum_score)
@@ -225,7 +225,7 @@ for (et in c("1Sg", "2Sg", "3Sggg", "all")) {
 }
 
 # ── Chi-square: YR vs non-YR across conditions, per end_type ─────────────────
-chisq_results <- lapply(c("1Sg", "2Sg", "3Sggg", "all"), function(et) {
+chisq_results <- lapply(c("1Sg", "2Sgg", "3Sggg", "all"), function(et) {
   # pool replicates per condition
   pooled <- sample_cat |>
     filter(end_type == et) |>

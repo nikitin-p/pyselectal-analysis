@@ -170,7 +170,7 @@ ctss_filtered <- merge(ctss, pos_to_cluster, by = c("chr", "pos", "strand"))
 
 tss_matrix <- ctss_filtered[, .(
   n_1Sg   = sum(n_1Sg),
-  n_2Sg   = sum(n_2Sg),
+  n_2Sgg   = sum(n_2Sgg),
   n_M     = sum(n_M),
   n_other = sum(n_other),
   n_total = sum(n_total)
@@ -178,10 +178,10 @@ tss_matrix <- ctss_filtered[, .(
 
 # Compute percentages
 tss_matrix[n_total > 0, pct_1Sg   := 100 * n_1Sg   / n_total]
-tss_matrix[n_total > 0, pct_2Sg   := 100 * n_2Sg   / n_total]
+tss_matrix[n_total > 0, pct_2Sgg   := 100 * n_2Sgg   / n_total]
 tss_matrix[n_total > 0, pct_M     := 100 * n_M     / n_total]
 tss_matrix[n_total > 0, pct_other := 100 * n_other / n_total]
-tss_matrix[n_total == 0, c("pct_1Sg","pct_2Sg","pct_M","pct_other") := NA_real_]
+tss_matrix[n_total == 0, c("pct_1Sg","pct_2Sgg","pct_M","pct_other") := NA_real_]
 
 # Attach dominant TSS annotation
 tss_matrix <- merge(tss_matrix, dominant, by = "cluster_id")
@@ -189,8 +189,8 @@ tss_matrix <- merge(tss_matrix, dominant, by = "cluster_id")
 setcolorder(tss_matrix, c(
   "cluster_id", "chr", "tss_pos", "strand", "initiator",
   "sample_id",
-  "n_1Sg", "n_2Sg", "n_M", "n_other", "n_total",
-  "pct_1Sg", "pct_2Sg", "pct_M", "pct_other"
+  "n_1Sg", "n_2Sgg", "n_M", "n_other", "n_total",
+  "pct_1Sg", "pct_2Sgg", "pct_M", "pct_other"
 ))
 setorder(tss_matrix, cluster_id, sample_id)
 

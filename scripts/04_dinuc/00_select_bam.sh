@@ -4,13 +4,13 @@
 #
 # Usage:
 #   bash scripts/04_dinuc/00_select_bam.sh [--bam_dir DIR] [--out_dir DIR] \
-#       [--samples FILE] [--params FILE] [--types "1Sg 2Sg"] [--force]
+#       [--samples FILE] [--params FILE] [--types "1Sg 2Sgg"] [--force]
 #
 # Outputs:
 #   <out_dir>/{sample_id}_1Sg.bam  (and .bai)
-#   <out_dir>/{sample_id}_2Sg.bam  (and .bai)
+#   <out_dir>/{sample_id}_2Sgg.bam  (and .bai)
 #   config/samples_1Sg.tsv
-#   config/samples_2Sg.tsv
+#   config/samples_2Sgg.tsv
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,7 +22,7 @@ PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 BAM_DIR=""
 OUT_DIR=""
-TYPES="1Sg 2Sg 3Sggg"
+TYPES="1Sg 2Sgg 3Sggg"
 FORCE=0
 
 while [[ $# -gt 0 ]]; do
@@ -53,7 +53,7 @@ mkdir -p "$OUT_DIR"
 select_spec() {
     case "$1" in
         1Sg)   echo "1Sg"   ;;
-        2Sg)   echo "2Sgg"  ;;
+        2Sgg)   echo "2Sgg"  ;;
         3Sggg) echo "3Sggg" ;;
         *)     echo "$1"    ;;
     esac
@@ -129,4 +129,4 @@ for TYPE in $TYPES; do
     log_info "Written: $TSV_OUT"
 done
 
-log_info "Selection complete. Run dinuc with --samples config/samples_1Sg.tsv or samples_2Sg.tsv"
+log_info "Selection complete. Run dinuc with --samples config/samples_1Sg.tsv or samples_2Sgg.tsv"
