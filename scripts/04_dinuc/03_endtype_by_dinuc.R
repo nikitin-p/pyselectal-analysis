@@ -11,6 +11,17 @@ suppressPackageStartupMessages({
   library(RColorBrewer)
 })
 
+# Sample name mapping for display
+rename_samples <- function(x) {
+  x <- gsub("yeast_cage_", "", x)
+  x <- gsub("_r", " ", x)
+  x <- gsub("ana", "Anaerobic", x)
+  x <- gsub("eth", "Ethanol", x)
+  x <- gsub("glu", "Glucose", x)
+  x <- gsub("nit", "Nitrogen", x)
+  x
+}
+
 # Paths
 results_dir <- "results"
 fig_dir <- file.path(results_dir, "figures")
@@ -93,18 +104,22 @@ agg_long <- agg_by_dinuc %>%
 # Colors for end types
 end_type_colors <- c("1Sg" = "#2166ac", "2Sgg" = "#67a9cf", "3Sggg" = "#d1e5f0", "M" = "#b2182b")
 
+# Canonical initiator (YR) axis label colors
+yr_dinucs <- c("CA", "CG", "TA", "TG")
+axis_colors <- ifelse(agg_by_dinuc$dinucleotide %in% yr_dinucs, "#e63946", "black")
+
 p1 <- ggplot(agg_long, aes(x = dinucleotide, y = percentage, fill = end_type)) +
   geom_bar(stat = "identity", position = "stack") +
   scale_fill_manual(values = end_type_colors, name = "End type") +
   labs(
     title = "End-type distribution by initiator dinucleotide",
-    subtitle = "Ordered by total expression (left = highest)",
+    subtitle = "Ordered by total expression (left = highest); YR initiators in red",
     x = "Initiator dinucleotide",
     y = "Percentage of reads"
   ) +
   theme_minimal() +
   theme(
-    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text.x = element_text(angle = 45, hjust = 1, color = axis_colors),
     legend.position = "right"
   )
 
@@ -142,6 +157,7 @@ pheatmap(
   cluster_cols = FALSE,
   scale = "none",
   main = "Percentage of 1Sg reads by dinucleotide",
+  labels_row = rename_samples(rownames(mat_1Sg)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,
   color = colorRampPalette(c("white", "#2166ac"))(50)
@@ -164,12 +180,36 @@ pheatmap(
   cluster_cols = FALSE,
   scale = "none",
   main = "Percentage of 2Sgg reads by dinucleotide",
+  labels_row = rename_samples(rownames(mat_2Sgg)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,
   color = colorRampPalette(c("white", "#67a9cf"))(50)
 )
 dev.off()
 cat("Saved: figures/dinuc_pct2Sgg_heatmap.pdf\n")
+
+# Heatmap of pct_3Sggg
+mat_3Sggg <- combined %>%
+  select(sample, dinucleotide, pct_3Sggg) %>%
+  pivot_wider(names_from = dinucleotide, values_from = pct_3Sggg) %>%
+  column_to_rownames("sample") %>%
+  as.matrix()
+mat_3Sggg <- mat_3Sggg[, col_order]
+
+pdf(file.path(fig_dir, "dinuc_pct3Sggg_heatmap.pdf"), width = 10, height = 6)
+pheatmap(
+  mat_3Sggg,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  scale = "none",
+  main = "Percentage of 3Sggg reads by dinucleotide",
+  labels_row = rename_samples(rownames(mat_3Sggg)),
+  annotation_col = col_annotation,
+  annotation_colors = ann_colors,
+  color = colorRampPalette(c("white", "#d1e5f0"))(50)
+)
+dev.off()
+cat("Saved: figures/dinuc_pct3Sggg_heatmap.pdf\n")
 
 # ============================================================================
 # STATISTICAL TEST: Is G-appending proportion dependent on first base?
