@@ -6,3 +6,13 @@ logs/
 results/
 test/
 pyselectal.py
+config/params_cageseq2_test_standard_samplesheet_for_pavel.yaml
+config/samplesheet.csv
+download_from_server.sh
+config/samples_1Sg.tsv
+config/samples_2Sg.tsv
+config/samples_2Sgg.tsv
+config/samples_3Sggg.tsv
+.superpowers/
+cageseq2_bin/
+docs/

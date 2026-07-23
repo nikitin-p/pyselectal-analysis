@@ -22,7 +22,7 @@ PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 BAM_DIR=""
 OUT_DIR=""
-TYPES="1Sg 2Sgg 3Sggg"
+TYPES="1Sg 2Sgg 3Sggg other_soft_clipped"
 FORCE=0
 
 while [[ $# -gt 0 ]]; do
@@ -52,10 +52,11 @@ mkdir -p "$OUT_DIR"
 # pyselectal --select spec for each type label
 select_spec() {
     case "$1" in
-        1Sg)   echo "1Sg"   ;;
-        2Sgg)   echo "2Sgg"  ;;
-        3Sggg) echo "3Sggg" ;;
-        *)     echo "$1"    ;;
+        1Sg)               echo "1Sg"   ;;
+        2Sgg)              echo "2Sgg"  ;;
+        3Sggg)             echo "3Sggg" ;;
+        other_soft_clipped) echo "other_soft_clipped" ;;
+        *)                 echo "$1"    ;;
     esac
 }
 

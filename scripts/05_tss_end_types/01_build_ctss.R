@@ -1,6 +1,6 @@
 #!/usr/bin/env Rscript
 # Stage 8 step 1: classify every read in each subsampled BAM by 5'-end type
-# (1Sg / 2Sgg / M / other) and aggregate to a per-position per-sample typed CTSS table.
+# (1Sg / 2Sgg / 3Sggg / M / other) and aggregate to a per-position per-sample typed CTSS table.
 #
 # Classification is strand-aware using CIGAR + sequence:
 #   + strand: 5' soft clip = start of CIGAR; first stored base checked for G
@@ -113,11 +113,25 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
     first_g[minus_clip]  <- last_chars == "C"  # original 5' G stored as C after RC
   }
 
+  # Check if all 3 bases are G for 3Sggg classification
+  all_three_g <- logical(length(ga))
+  len3_clip <- clen == 3 & has_clip
+  if (any(len3_clip & is_plus)) {
+    idx <- which(len3_clip & is_plus)
+    all_three_g[idx] <- substr(seq_str[idx], 1, 3) == "GGG"
+  }
+  if (any(len3_clip & !is_plus)) {
+    idx <- which(len3_clip & !is_plus)
+    last3 <- substr(seq_str[idx], nchar(seq_str[idx]) - 2, nchar(seq_str[idx]))
+    all_three_g[idx] <- last3 == "CCC"  # original 5' GGG stored as CCC after RC
+  }
+
   # Assign type
   type <- character(length(ga))
   type[clen == 0]                   <- "M"
   type[clen == 1 & first_g]         <- "1Sg"
   type[clen == 2 & first_g]         <- "2Sgg"
+  type[clen == 3 & all_three_g]     <- "3Sggg"
   type[type == ""]                  <- "other"
 
   # Aggregate: (chr, pos, strand, type) → count
@@ -135,13 +149,13 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
   wide <- dcast(agg, chr + pos + strand ~ type, value.var = "n", fill = 0L)
 
   # Ensure all type columns present
-  for (col in c("1Sg", "2Sgg", "M", "other")) {
+  for (col in c("1Sg", "2Sgg", "3Sggg", "M", "other")) {
     if (!col %in% colnames(wide)) wide[[col]] <- 0L
   }
 
-  wide[, n_total := `1Sg` + `2Sgg` + M + other]
-  setnames(wide, c("1Sg", "2Sgg", "M", "other"),
-           c("n_1Sg", "n_2Sgg", "n_M", "n_other"))
+  wide[, n_total := `1Sg` + `2Sgg` + `3Sggg` + M + other]
+  setnames(wide, c("1Sg", "2Sgg", "3Sggg", "M", "other"),
+           c("n_1Sg", "n_2Sgg", "n_3Sggg", "n_M", "n_other"))
   wide[, sample_id := sample_id]
 
   wide

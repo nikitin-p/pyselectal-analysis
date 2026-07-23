@@ -8,7 +8,7 @@ This is a computational framework for analyzing CAGE and NET-CAGE datasets to ch
 
 | Dataset | Conditions | Genome | Status |
 | --- | --- | --- | --- |
-| Yeast CAGE (Börlin et al. 2019, FEMS Yeast Res.) | anaerobic, ethanol, glucose, nitrogen × 2 reps | CENPK113-7D (custom) | in progress |
+| Yeast CAGE (Börlin et al. 2019, FEMS Yeast Res.) | anaerobic, ethanol, glucose, nitrogen × 2 reps | sacCer3 | in progress |
 | LUHMES CAGE + NET-CAGE | 3 differentiation time points | hg38 | awaiting data |
 | NET-CAGE paper cell lines | 2–3 lines, CAGE + NET-CAGE | hg38 | awaiting data |
 | TLDR-seq | — | hg38 | awaiting data |
@@ -19,7 +19,7 @@ This is a computational framework for analyzing CAGE and NET-CAGE datasets to ch
 | --- | --- | --- |
 | `sacCer3` | UCSC Golden Path | `BSgenome.Scerevisiae.UCSC.sacCer3` |
 | `hg38` | GENCODE GRCh38 primary assembly | `BSgenome.Hsapiens.UCSC.hg38` |
-| Custom yeast | CENPK113-7D assembly, Börlin et al. 2019 | FASTA path in `samples.tsv` |
+| sacCer3 | UCSC S. cerevisiae reference | `data/sacCer3.fa` |
 
 ---
 
@@ -61,7 +61,7 @@ The `--force` flag can be added to any individual stage script as well.
 **Input:** Trimmed and UMI-processed FASTQ files are expected in `data/`.  
 **Output:** The filtered alignments are written to `results/bam/{sample}_uniq.bam`.
 
-STAR is run with `--alignEndsType Local` so that soft-clips are preserved; only uniquely mapped reads (MAPQ = 255) are retained via `samtools view -q 255`. Mapping is run sequentially per sample and is multi-threaded within each sample (`threads: 10` in `params.yaml`). For the CENPK113-7D custom assembly, the index was built with `--genomeSAindexNbases 11`.
+STAR is run with `--alignEndsType Local` so that soft-clips are preserved; only uniquely mapped reads (MAPQ = 255) are retained via `samtools view -q 255`. Mapping is run sequentially per sample and is multi-threaded within each sample (`threads: 10` in `params.yaml`). For sacCer3, the index was built with `--genomeSAindexNbases 11`.
 
 Key STAR flags:
 
@@ -201,25 +201,54 @@ TSS are clustered hierarchically by their mean end-type vector using Euclidean d
 
 ---
 
-### Stage 10 — CAGEr promoter clusters + gene-type enrichment (scripted)
+### Stage 10 — Genomic localization by end type
 
-**Scripts:** `scripts/06_cager/run.sh`  
+**Scripts:** `scripts/06_localization/run.sh`, `01_localization.R`  
+**Status:** The analysis is complete for the yeast dataset.  
+**Input:** `results/bam_selected/`, `results/bam_subsampled/`, `data/sacCer3.ensGene.gtf`  
+**Output:** The outputs are written to `results/localization/` and `results/figures/10_*.pdf`.
+
+The script compares the genomic localization of different 5′ end types (1Sg, 2Sgg, 3Sggg, M) across annotation categories to assess whether multi-G variants represent genuine TSS signals.
+
+**Two annotation modes are available:**
+
+- **Fast mode** (`--fast`): Uses direct TxDb-based annotation with `findOverlaps()`. Low memory, suitable for local runs. Categories: Promoter > 5'UTR > 3'UTR > CDS > Intron > Intergenic.
+- **Full mode** (default): Uses ChIPseeker for annotation and CAGEfightR for bidirectional enhancer detection. Requires >32 GB RAM. Categories: Promoter > Enhancer > 5'UTR > 3'UTR > Exon > Intron > Downstream > Intergenic.
+
+The reference scripts in `cageseq2_bin/` demonstrate state-of-the-art CAGE analysis with CAGEr and CAGEfightR (including proper enhancer calling via bidirectional balance score).
+
+**Key findings (yeast dataset):**
+
+| End Type | Promoter | CDS | Intergenic |
+| --- | --- | --- | --- |
+| 1Sg | 97.2% | 0.8% | 2.0% |
+| 2Sgg | 97.1% | 1.0% | 1.9% |
+| 3Sggg | 97.6% | 0.8% | 1.6% |
+| M | 69.9% | 18.6% | 11.3% |
+
+2Sgg and 3Sggg localize almost identically to 1Sg (~97% at promoters), supporting that they are genuine TSS signals with additional non-templated G additions. M-type shows dramatically different distribution (only 70% promoter).
+
+---
+
+### Stage 11 — CAGEr promoter clusters + gene-type enrichment (scripted)
+
+**Scripts:** `scripts/07_cager/run.sh`  
 **Output:** `results/cager/`
 
 The scripts perform a fresh CAGEr run: `filterLowExpCTSS` (TPM ≥ 1), `distclu` (maxDist 20, keepSingletonsAbove 5), IQW calculation, and gene-type enrichment analysis among coding and noncoding subclasses.
 
 ---
 
-### Stage 11 — Expression dynamics (scripted)
+### Stage 12 — Expression dynamics (scripted)
 
-**Scripts:** `scripts/06_expression/run.sh`  
+**Scripts:** `scripts/07_expression/run.sh`  
 **Output:** `results/expression/`
 
 Expression dynamics of TSS clusters with ≥ `expr_min_pct_1Sg` % 1Sg reads are tracked across all conditions.
 
 ---
 
-### Stage 12 (planned)
+### Stage 13 (planned)
 
 The distribution of reads in repetitive vs unique regions is characterized; TLDR-seq observed-vs-expected 5′ ends are compared.
 
@@ -244,6 +273,7 @@ results/
   dinuc_2Sgg/            dinucleotide proportions (2Sgg reads only)
   dinuc_all/            dinucleotide proportions merged across all samples
   tss/                  typed_ctss.tsv.gz, tss_matrix.tsv, tss_clustered.tsv, tss_hclust.rds
+  localization/         genomic localization by end type (category_counts.tsv, category_summary.tsv)
   cager/                CAGEr promoter clusters
   cageseq/              CAGEr SE objects
   annotation/           ChIPseeker output
@@ -256,8 +286,9 @@ scripts/
   03_five_prime/        5′-end counting, plotting, soft-clip composition
   04_dinuc/             BAM selection, dinucleotide profiling, YR enrichment
   05_tss_end_types/     CIGAR-based read classification, distclu clustering, annotation, figures
-  06_cager/             (scripted) CAGEr promoter clusters, gene-type enrichment
-  06_expression/        (planned) TSS cluster expression dynamics
+  06_localization/      genomic localization by end type (ChIPseeker/TxDb annotation)
+  07_cager/             (scripted) CAGEr promoter clusters, gene-type enrichment
+  07_expression/        (planned) TSS cluster expression dynamics
   99_additional/        (planned) repeats, TLDR-seq
   utils/                log.sh, parse_yaml.sh
 logs/                   per-script timestamped logs

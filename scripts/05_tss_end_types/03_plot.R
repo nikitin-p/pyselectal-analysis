@@ -4,7 +4,7 @@
 # Outputs:
 #   results/figures/08_tss_heatmap_pct1Sg.pdf  — heatmap rows=TSS sorted by mean pct_1Sg,
 #                                                  cols=conditions, fill=pct_1Sg
-#   results/figures/08_initiator_boxplot.pdf    — pct_1Sg / pct_2Sgg by initiator dinucleotide
+#   results/figures/08_initiator_boxplot.pdf    — pct_1Sg / pct_2Sgg / pct_3Sggg by initiator dinucleotide
 #   results/figures/08_initiator_stacked.pdf    — stacked end-type fractions per initiator
 #
 # Usage (from project root):
@@ -67,6 +67,7 @@ mat <- merge(mat, cond_map, by = "sample_id", all.x = TRUE)
 cond_mat <- mat[, .(
   n_1Sg   = sum(n_1Sg),
   n_2Sgg   = sum(n_2Sgg),
+  n_3Sggg = sum(n_3Sggg),
   n_M     = sum(n_M),
   n_other = sum(n_other),
   n_total = sum(n_total)
@@ -74,10 +75,11 @@ cond_mat <- mat[, .(
 
 cond_mat[n_total >= min_cond_reads, pct_1Sg   := 100 * n_1Sg   / n_total]
 cond_mat[n_total >= min_cond_reads, pct_2Sgg   := 100 * n_2Sgg   / n_total]
+cond_mat[n_total >= min_cond_reads, pct_3Sggg := 100 * n_3Sggg / n_total]
 cond_mat[n_total >= min_cond_reads, pct_M     := 100 * n_M     / n_total]
 cond_mat[n_total >= min_cond_reads, pct_other := 100 * n_other / n_total]
 cond_mat[n_total < min_cond_reads,
-         c("pct_1Sg","pct_2Sgg","pct_M","pct_other") := NA_real_]
+         c("pct_1Sg","pct_2Sgg","pct_3Sggg","pct_M","pct_other") := NA_real_]
 
 # ── Figure 1: heatmap pct_1Sg sorted by mean across conditions ───────────────
 message("  heatmap: ", out_heat)
@@ -126,9 +128,9 @@ keep_init   <- init_counts[N >= 5, initiator]
 
 box_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg)] |>
   as.data.frame() |>
-  pivot_longer(cols = c(pct_1Sg, pct_2Sgg),
+  pivot_longer(cols = c(pct_1Sg, pct_2Sgg, pct_3Sggg),
                names_to = "end_type", values_to = "pct") |>
-  mutate(end_type = recode(end_type, pct_1Sg = "1Sg", pct_2Sgg = "2Sgg"))
+  mutate(end_type = recode(end_type, pct_1Sg = "1Sg", pct_2Sgg = "2Sgg", pct_3Sggg = "3Sggg"))
 
 # Order initiators by median pct_1Sg descending
 init_order <- box_dat |>
@@ -142,7 +144,7 @@ init_label_colors <- ifelse(init_order$initiator %in% canonical, "#e63946", "bla
 
 p_box <- ggplot(box_dat, aes(x = initiator, y = pct, fill = end_type)) +
   geom_boxplot(outlier.size = 0.4, outlier.alpha = 0.3, linewidth = 0.35) +
-  scale_fill_manual(values = c("1Sg" = "#4361ee", "2Sgg" = "#f72585"),
+  scale_fill_manual(values = c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7"),
                     name = "End type") +
   labs(
     title = "RT template switching by initiator dinucleotide",
@@ -165,6 +167,7 @@ message("  stacked bar: ", out_stack)
 stack_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg),
                        .(mean_1Sg   = mean(pct_1Sg,   na.rm = TRUE),
                          mean_2Sgg   = mean(pct_2Sgg,   na.rm = TRUE),
+                         mean_3Sggg = mean(pct_3Sggg, na.rm = TRUE),
                          mean_M     = mean(pct_M,     na.rm = TRUE),
                          mean_other = mean(pct_other, na.rm = TRUE)),
                        by = initiator] |>
@@ -172,11 +175,11 @@ stack_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg),
   pivot_longer(cols = starts_with("mean_"),
                names_to = "end_type", values_to = "pct") |>
   mutate(end_type = sub("mean_", "", end_type),
-         end_type = factor(end_type, levels = c("1Sg", "2Sgg", "M", "other")))
+         end_type = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")))
 
 stack_dat$initiator <- factor(stack_dat$initiator, levels = init_order$initiator)
 
-type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585",
+type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7",
                  "M"   = "#06d6a0", "other" = "#adb5bd")
 
 p_stack <- ggplot(stack_dat, aes(x = initiator, y = pct, fill = end_type)) +

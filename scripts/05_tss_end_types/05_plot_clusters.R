@@ -60,7 +60,7 @@ dt  <- fread(clustered_f)
 hc  <- readRDS(hclust_rds)
 
 k_clusters  <- uniqueN(dt$hclust_group)
-type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585",
+type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7",
                  "M"   = "#06d6a0", "other" = "#adb5bd")
 
 # Cluster group colors
@@ -114,11 +114,11 @@ dt_ord$hclust_group <- factor(dt_ord$hclust_group, levels = group_levels)
 heat_long <- dt_ord |>
   as.data.frame() |>
   select(row_rank, hclust_group,
-         `1Sg` = mean_pct_1Sg, `2Sgg` = mean_pct_2Sgg,
+         `1Sg` = mean_pct_1Sg, `2Sgg` = mean_pct_2Sgg, `3Sggg` = mean_pct_3Sggg,
          M = mean_pct_M, other = mean_pct_other) |>
-  pivot_longer(cols = c(`1Sg`, `2Sgg`, M, other),
+  pivot_longer(cols = c(`1Sg`, `2Sgg`, `3Sggg`, M, other),
                names_to = "end_type", values_to = "pct") |>
-  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sgg", "M", "other")))
+  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")))
 
 n_tss <- nrow(dt_ord)
 
@@ -164,15 +164,16 @@ bar_dat <- dt |>
   summarise(
     `1Sg`  = mean(mean_pct_1Sg,   na.rm = TRUE),
     `2Sgg`  = mean(mean_pct_2Sgg,   na.rm = TRUE),
+    `3Sggg` = mean(mean_pct_3Sggg, na.rm = TRUE),
     M      = mean(mean_pct_M,     na.rm = TRUE),
     other  = mean(mean_pct_other, na.rm = TRUE),
     n      = n(),
     .groups = "drop"
   ) |>
-  pivot_longer(cols = c(`1Sg`, `2Sgg`, M, other),
+  pivot_longer(cols = c(`1Sg`, `2Sgg`, `3Sggg`, M, other),
                names_to = "end_type", values_to = "pct") |>
   mutate(
-    end_type    = factor(end_type, levels = c("1Sg", "2Sgg", "M", "other")),
+    end_type    = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")),
     hclust_group = factor(hclust_group, levels = group_levels),
     label       = paste0(hclust_group, "\n(n=", n, ")")
   )

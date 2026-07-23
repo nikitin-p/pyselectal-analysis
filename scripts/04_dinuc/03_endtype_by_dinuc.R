@@ -32,21 +32,24 @@ dinuc_all <- read.delim(file.path(results_dir, "dinuc_all", "all_dinuc_proportio
 dinuc_1Sg <- read.delim(file.path(results_dir, "dinuc_1Sg", "all_dinuc_proportions.tsv"))
 dinuc_2Sgg <- read.delim(file.path(results_dir, "dinuc_2Sgg", "all_dinuc_proportions.tsv"))
 dinuc_3Sggg <- read.delim(file.path(results_dir, "dinuc_3Sggg", "all_dinuc_proportions.tsv"))
+dinuc_other <- read.delim(file.path(results_dir, "dinuc_other_soft_clipped", "all_dinuc_proportions.tsv"))
 
 # Rename sum_score columns and join
 dinuc_all <- dinuc_all %>% select(sample, dinucleotide, n_all = sum_score)
 dinuc_1Sg <- dinuc_1Sg %>% select(sample, dinucleotide, n_1Sg = sum_score)
 dinuc_2Sgg <- dinuc_2Sgg %>% select(sample, dinucleotide, n_2Sgg = sum_score)
 dinuc_3Sggg <- dinuc_3Sggg %>% select(sample, dinucleotide, n_3Sggg = sum_score)
+dinuc_other <- dinuc_other %>% select(sample, dinucleotide, n_other = sum_score)
 
 # Combine - use left join from dinuc_all to keep all dinucleotides
 combined <- dinuc_all %>%
   left_join(dinuc_1Sg, by = c("sample", "dinucleotide")) %>%
   left_join(dinuc_2Sgg, by = c("sample", "dinucleotide")) %>%
   left_join(dinuc_3Sggg, by = c("sample", "dinucleotide")) %>%
-  replace_na(list(n_1Sg = 0, n_2Sgg = 0, n_3Sggg = 0)) %>%
+  left_join(dinuc_other, by = c("sample", "dinucleotide")) %>%
+  replace_na(list(n_1Sg = 0, n_2Sgg = 0, n_3Sggg = 0, n_other = 0)) %>%
   mutate(
-    n_M = n_all - n_1Sg - n_2Sgg - n_3Sggg,
+    n_M = n_all - n_1Sg - n_2Sgg - n_3Sggg - n_other,
     n_M = pmax(n_M, 0)  # safety
   )
 
@@ -56,6 +59,7 @@ combined <- combined %>%
     pct_1Sg = n_1Sg / n_all * 100,
     pct_2Sgg = n_2Sgg / n_all * 100,
     pct_3Sggg = n_3Sggg / n_all * 100,
+    pct_other = n_other / n_all * 100,
     pct_M = n_M / n_all * 100
   )
 
@@ -81,6 +85,7 @@ agg_by_dinuc <- combined %>%
     n_1Sg = sum(n_1Sg),
     n_2Sgg = sum(n_2Sgg),
     n_3Sggg = sum(n_3Sggg),
+    n_other = sum(n_other),
     n_M = sum(n_M),
     .groups = "drop"
   ) %>%
@@ -88,21 +93,23 @@ agg_by_dinuc <- combined %>%
     pct_1Sg = n_1Sg / total * 100,
     pct_2Sgg = n_2Sgg / total * 100,
     pct_3Sggg = n_3Sggg / total * 100,
+    pct_other = n_other / total * 100,
     pct_M = n_M / total * 100
   ) %>%
   arrange(desc(total))
 
 # Pivot for stacked bar
 agg_long <- agg_by_dinuc %>%
-  select(dinucleotide, total, pct_1Sg, pct_2Sgg, pct_3Sggg, pct_M) %>%
+  select(dinucleotide, total, pct_1Sg, pct_2Sgg, pct_3Sggg, pct_other, pct_M) %>%
   pivot_longer(cols = starts_with("pct_"), names_to = "end_type", values_to = "percentage") %>%
   mutate(
-    end_type = factor(gsub("pct_", "", end_type), levels = c("M", "3Sggg", "2Sgg", "1Sg")),
+    end_type = factor(gsub("pct_", "", end_type), levels = c("M", "other", "3Sggg", "2Sgg", "1Sg")),
     dinucleotide = factor(dinucleotide, levels = agg_by_dinuc$dinucleotide)
   )
 
 # Colors for end types
-end_type_colors <- c("1Sg" = "#2166ac", "2Sgg" = "#67a9cf", "3Sggg" = "#d1e5f0", "M" = "#b2182b")
+end_type_colors <- c("1Sg" = "#2166ac", "2Sgg" = "#67a9cf", "3Sggg" = "#d1e5f0",
+                     "other" = "#adb5bd", "M" = "#b2182b")
 
 # Canonical initiator (YR) axis label colors
 yr_dinucs <- c("CA", "CG", "TA", "TG")
@@ -211,6 +218,29 @@ pheatmap(
 dev.off()
 cat("Saved: figures/dinuc_pct3Sggg_heatmap.pdf\n")
 
+# Heatmap of pct_other
+mat_other <- combined %>%
+  select(sample, dinucleotide, pct_other) %>%
+  pivot_wider(names_from = dinucleotide, values_from = pct_other) %>%
+  column_to_rownames("sample") %>%
+  as.matrix()
+mat_other <- mat_other[, col_order]
+
+pdf(file.path(fig_dir, "dinuc_pct_other_heatmap.pdf"), width = 10, height = 6)
+pheatmap(
+  mat_other,
+  cluster_rows = TRUE,
+  cluster_cols = FALSE,
+  scale = "none",
+  main = "Percentage of other soft-clipped reads by dinucleotide",
+  labels_row = rename_samples(rownames(mat_other)),
+  annotation_col = col_annotation,
+  annotation_colors = ann_colors,
+  color = colorRampPalette(c("white", "#adb5bd"))(50)
+)
+dev.off()
+cat("Saved: figures/dinuc_pct_other_heatmap.pdf\n")
+
 # ============================================================================
 # STATISTICAL TEST: Is G-appending proportion dependent on first base?
 # ============================================================================
@@ -226,14 +256,16 @@ test_data <- combined %>%
   filter(!grepl("^G", dinucleotide)) %>%
   group_by(first_base) %>%
   summarise(
-    n_soft = sum(n_1Sg + n_2Sgg + n_3Sggg),
+    n_soft = sum(n_1Sg + n_2Sgg + n_3Sggg + n_other),
     n_2Sgg = sum(n_2Sgg),
     n_3Sggg = sum(n_3Sggg),
+    n_other = sum(n_other),
     .groups = "drop"
   ) %>%
   mutate(
     pct_2Sgg = n_2Sgg / n_soft * 100,
-    pct_3Sggg = n_3Sggg / n_soft * 100
+    pct_3Sggg = n_3Sggg / n_soft * 100,
+    pct_other = n_other / n_soft * 100
   )
 
 cat("Summary by first base (pooled across samples):\n")
@@ -331,14 +363,16 @@ dinuc_agg <- combined %>%
   filter(!grepl("^G", dinucleotide)) %>%
   group_by(dinucleotide) %>%
   summarise(
-    n_soft = sum(n_1Sg + n_2Sgg + n_3Sggg),
+    n_soft = sum(n_1Sg + n_2Sgg + n_3Sggg + n_other),
     n_2Sgg = sum(n_2Sgg),
     n_3Sggg = sum(n_3Sggg),
+    n_other = sum(n_other),
     .groups = "drop"
   ) %>%
   mutate(
     pct_2Sgg = n_2Sgg / n_soft * 100,
     pct_3Sggg = n_3Sggg / n_soft * 100,
+    pct_other = n_other / n_soft * 100,
     first_base = substr(dinucleotide, 1, 1)
   ) %>%
   arrange(desc(n_soft))

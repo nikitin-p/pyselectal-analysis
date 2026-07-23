@@ -9,8 +9,10 @@
 # 5. Subsample each retained library to target using samtools view -s SEED.FRAC.
 #
 # Skips samples whose output already exists unless --force is given.
+# Compatible with bash 3.2+ (macOS default).
 
 set -euo pipefail
+export LC_NUMERIC=C
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$PROJECT_ROOT/scripts/utils/log.sh"
@@ -47,23 +49,30 @@ THREADS=4
 
 mkdir -p "$BAM_OUT_DIR" "$LOG_DIR"
 
-# ── collect BAMs and count reads ──────────────────────────────────────────────
-mapfile -t BAMS < <(ls "$BAM_IN_DIR"/*_uniq.bam 2>/dev/null)
+# ── collect BAMs and count reads (using parallel arrays for bash 3.2 compat) ─
+SAMPLES=()
+COUNTS=()
+BAMS=()
+
+for BAM in "$BAM_IN_DIR"/*_uniq.bam; do
+    [[ -f "$BAM" ]] || continue
+    BAMS+=("$BAM")
+done
+
 [[ ${#BAMS[@]} -eq 0 ]] && die "No *_uniq.bam files found in $BAM_IN_DIR"
 
 log_info "Found ${#BAMS[@]} BAMs — counting reads..."
 
-declare -A COUNTS
 for BAM in "${BAMS[@]}"; do
     SAMPLE=$(basename "$BAM" _uniq.bam)
     N=$($SAMTOOLS view -c -F 256 "$BAM")
-    COUNTS[$SAMPLE]=$N
+    SAMPLES+=("$SAMPLE")
+    COUNTS+=("$N")
     log_info "  $SAMPLE: $N"
 done
 
 # ── compute Q1, Q3, IQR and Tukey lower fence ──────────────────────────────────
-ALL_COUNTS=( "${COUNTS[@]}" )
-read -r Q1 Q3 IQR DEPTH_THRESHOLD < <(printf '%s\n' "${ALL_COUNTS[@]}" | sort -n | awk '
+read -r Q1 Q3 IQR DEPTH_THRESHOLD < <(printf '%s\n' "${COUNTS[@]}" | sort -n | awk '
     {a[NR]=$1}
     END{
         n=NR
@@ -85,30 +94,38 @@ read -r Q1 Q3 IQR DEPTH_THRESHOLD < <(printf '%s\n' "${ALL_COUNTS[@]}" | sort -n
 log_info "Q1=$Q1  Q3=$Q3  IQR=$IQR  Tukey lower fence (exclusion threshold)=$DEPTH_THRESHOLD"
 
 # ── filter low-coverage libraries ─────────────────────────────────────────────
-declare -A RETAINED
-for SAMPLE in "${!COUNTS[@]}"; do
-    N=${COUNTS[$SAMPLE]}
+RETAINED_SAMPLES=()
+RETAINED_COUNTS=()
+EXCLUDED=0
+
+for i in "${!SAMPLES[@]}"; do
+    SAMPLE="${SAMPLES[$i]}"
+    N="${COUNTS[$i]}"
     if (( N < DEPTH_THRESHOLD )); then
         log_warn "EXCLUDED $SAMPLE: $N reads < threshold $DEPTH_THRESHOLD (Q1 - 1.5×IQR)"
+        EXCLUDED=$((EXCLUDED + 1))
     else
-        RETAINED[$SAMPLE]=$N
+        RETAINED_SAMPLES+=("$SAMPLE")
+        RETAINED_COUNTS+=("$N")
         log_info "RETAINED $SAMPLE: $N reads"
     fi
 done
 
-[[ ${#RETAINED[@]} -eq 0 ]] && die "All libraries excluded — check min_library_depth_fraction in params.yaml"
+[[ ${#RETAINED_SAMPLES[@]} -eq 0 ]] && die "All libraries excluded — check min_library_depth_fraction in params.yaml"
 
 # ── compute subsampling target from retained libraries ────────────────────────
 MIN_RETAINED=999999999999
-for N in "${RETAINED[@]}"; do
+for N in "${RETAINED_COUNTS[@]}"; do
     (( N < MIN_RETAINED )) && MIN_RETAINED=$N
 done
 
 TARGET=$(echo "$MIN_RETAINED $FACTOR" | awk '{printf "%d", $1 * $2}')
-log_info "Retained ${#RETAINED[@]} / ${#COUNTS[@]} libraries — min=$MIN_RETAINED  factor=$FACTOR  target=$TARGET"
+log_info "Retained ${#RETAINED_SAMPLES[@]} / ${#SAMPLES[@]} libraries — min=$MIN_RETAINED  factor=$FACTOR  target=$TARGET"
 
 # ── subsample ─────────────────────────────────────────────────────────────────
-for SAMPLE in "${!RETAINED[@]}"; do
+for i in "${!RETAINED_SAMPLES[@]}"; do
+    SAMPLE="${RETAINED_SAMPLES[$i]}"
+    N="${RETAINED_COUNTS[$i]}"
     BAM="$BAM_IN_DIR/${SAMPLE}_uniq.bam"
     OUT="$BAM_OUT_DIR/${SAMPLE}_sub.bam"
     LOG="$LOG_DIR/02_subsample_${SAMPLE}_$(date '+%Y%m%d_%H%M%S').log"
@@ -118,7 +135,6 @@ for SAMPLE in "${!RETAINED[@]}"; do
         continue
     fi
 
-    N=${RETAINED[$SAMPLE]}
     FRAC=$(echo "$N $TARGET" | awk '{f=$2/$1; if(f>1)f=1; printf "%.6f", f}')
     FRAC_PART="${FRAC#0}"
     S_FLAG="${SEED}${FRAC_PART}"
