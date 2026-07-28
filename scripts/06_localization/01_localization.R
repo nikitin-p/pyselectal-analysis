@@ -329,7 +329,7 @@ if (!fast_mode) {
 # ── Process all samples ───────────────────────────────────────────────────────
 message("\nProcessing samples...")
 
-end_types <- c("1Sg", "2Sgg", "3Sggg", "M")
+end_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M")
 results_list <- list()
 
 for (i in seq_len(nrow(samples))) {
@@ -337,19 +337,15 @@ for (i in seq_len(nrow(samples))) {
   message("  ", sample_id)
 
   for (et in end_types) {
-    if (et == "M") {
-      bam_path <- file.path(bam_sub, paste0(sample_id, "_sub.bam"))
-    } else {
-      bam_path <- file.path(bam_sel, paste0(sample_id, "_", et, ".bam"))
+    # All types now have pre-selected BAM files from 00_select_bam.sh
+    bam_path <- file.path(bam_sel, paste0(sample_id, "_", et, ".bam"))
+
+    if (!file.exists(bam_path)) {
+      message("    [", et, "] BAM not found: ", bam_path)
+      next
     }
 
-    if (!file.exists(bam_path)) next
-
-    if (et == "M") {
-      pos_gr <- bam_to_5prime_M(bam_path)
-    } else {
-      pos_gr <- bam_to_5prime(bam_path)
-    }
+    pos_gr <- bam_to_5prime(bam_path)
 
     if (length(pos_gr) == 0) next
 
@@ -413,7 +409,7 @@ ref_reads <- summary_dt[end_type == "1Sg", .(category, total_reads)]
 ref_prop <- setNames(ref_reads$total_reads / sum(ref_reads$total_reads), ref_reads$category)
 
 chisq_results <- list()
-for (et in intersect(c("2Sgg", "3Sggg", "M"), unique(summary_dt$end_type))) {
+for (et in intersect(c("2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"), unique(summary_dt$end_type))) {
   obs <- summary_dt[end_type == et, .(category, total_reads)]
   common <- intersect(names(ref_prop), obs$category)
   if (length(common) < 2) next
@@ -456,7 +452,7 @@ plot_dt <- melt(summary_dt, id.vars = c("end_type", "category"),
                 variable.name = "level", value.name = "pct")
 plot_dt[, level := gsub("pct_", "", level)]
 plot_dt[, category := factor(category, levels = cat_order)]
-plot_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M"))]
+plot_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"))]
 
 p_bar <- ggplot(plot_dt[!is.na(category)], aes(x = end_type, y = pct, fill = category)) +
   geom_col(position = "stack", width = 0.7) +
@@ -480,7 +476,7 @@ enrich_wide <- dcast(enrich_dt, end_type ~ category, value.var = "log2_enrich")
 enrich_mat <- as.matrix(enrich_wide[, -1, with = FALSE])
 rownames(enrich_mat) <- enrich_wide$end_type
 
-avail_types <- intersect(c("1Sg", "2Sgg", "3Sggg", "M"), rownames(enrich_mat))
+avail_types <- intersect(c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"), rownames(enrich_mat))
 avail_cats <- intersect(cat_order, colnames(enrich_mat))
 enrich_mat <- enrich_mat[avail_types, avail_cats, drop = FALSE]
 
@@ -495,7 +491,7 @@ message("  written: 10_localization_enrichment.pdf")
 # Per-sample plot
 sample_dt <- results_dt[, .(pct = 100 * n_reads / sum(n_reads)), by = .(sample_id, end_type, category)]
 sample_dt[, category := factor(category, levels = cat_order)]
-sample_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M"))]
+sample_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"))]
 
 p_sample <- ggplot(sample_dt[!is.na(category)], aes(x = end_type, y = pct, fill = category)) +
   geom_col(position = "stack", width = 0.7) +

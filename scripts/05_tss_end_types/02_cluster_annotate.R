@@ -170,20 +170,24 @@ ctss_filtered <- merge(ctss, pos_to_cluster, by = c("chr", "pos", "strand"))
 
 tss_matrix <- ctss_filtered[, .(
   n_1Sg   = sum(n_1Sg),
-  n_2Sgg   = sum(n_2Sgg),
+  n_2Sgg  = sum(n_2Sgg),
   n_3Sggg = sum(n_3Sggg),
+  n_1Sa   = sum(n_1Sa),
+  n_1St   = sum(n_1St),
+  n_1Sc   = sum(n_1Sc),
   n_M     = sum(n_M),
   n_other = sum(n_other),
   n_total = sum(n_total)
 ), by = .(cluster_id, sample_id)]
 
 # Compute percentages
-tss_matrix[n_total > 0, pct_1Sg   := 100 * n_1Sg   / n_total]
-tss_matrix[n_total > 0, pct_2Sgg   := 100 * n_2Sgg   / n_total]
-tss_matrix[n_total > 0, pct_3Sggg := 100 * n_3Sggg / n_total]
-tss_matrix[n_total > 0, pct_M     := 100 * n_M     / n_total]
-tss_matrix[n_total > 0, pct_other := 100 * n_other / n_total]
-tss_matrix[n_total == 0, c("pct_1Sg","pct_2Sgg","pct_3Sggg","pct_M","pct_other") := NA_real_]
+all_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M", "other")
+for (typ in all_types) {
+  n_col <- paste0("n_", typ)
+  p_col <- paste0("pct_", typ)
+  tss_matrix[n_total > 0, (p_col) := 100 * get(n_col) / n_total]
+  tss_matrix[n_total == 0, (p_col) := NA_real_]
+}
 
 # Attach dominant TSS annotation
 tss_matrix <- merge(tss_matrix, dominant, by = "cluster_id")
@@ -191,8 +195,8 @@ tss_matrix <- merge(tss_matrix, dominant, by = "cluster_id")
 setcolorder(tss_matrix, c(
   "cluster_id", "chr", "tss_pos", "strand", "initiator",
   "sample_id",
-  "n_1Sg", "n_2Sgg", "n_3Sggg", "n_M", "n_other", "n_total",
-  "pct_1Sg", "pct_2Sgg", "pct_3Sggg", "pct_M", "pct_other"
+  paste0("n_", all_types), "n_total",
+  paste0("pct_", all_types)
 ))
 setorder(tss_matrix, cluster_id, sample_id)
 

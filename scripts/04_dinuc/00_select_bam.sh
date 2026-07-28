@@ -22,7 +22,7 @@ PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 BAM_DIR=""
 OUT_DIR=""
-TYPES="1Sg 2Sgg 3Sggg other_soft_clipped"
+TYPES="1Sg 2Sgg 3Sggg 1Sa 1St 1Sc M"
 FORCE=0
 
 while [[ $# -gt 0 ]]; do
@@ -55,6 +55,10 @@ select_spec() {
         1Sg)               echo "1Sg"   ;;
         2Sgg)              echo "2Sgg"  ;;
         3Sggg)             echo "3Sggg" ;;
+        1Sa)               echo "1Sa"   ;;
+        1St)               echo "1St"   ;;
+        1Sc)               echo "1Sc"   ;;
+        M)                 echo "M"     ;;
         other_soft_clipped) echo "other_soft_clipped" ;;
         *)                 echo "$1"    ;;
     esac

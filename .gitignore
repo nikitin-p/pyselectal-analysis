@@ -16,3 +16,8 @@ config/samples_3Sggg.tsv
 .superpowers/
 cageseq2_bin/
 docs/
+config/samples_1Sa.tsv
+config/samples_1Sc.tsv
+config/samples_1St.tsv
+config/samples_M.tsv
+config/samples_other_soft_clipped.tsv

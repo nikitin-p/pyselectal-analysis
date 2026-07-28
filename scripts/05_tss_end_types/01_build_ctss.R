@@ -91,48 +91,64 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
   cig  <- cigar(ga)
   clen <- clip5_len(cig, is_plus)
 
-  # First original 5' base:
+  # First original 5' base (strand-aware):
   #   + strand: first char of stored seq
   #   - strand: complement of last char of stored seq (BAM stores RC)
   seq_str <- as.character(mcols(ga)$seq)
   comp    <- c(A = "T", T = "A", G = "C", C = "G", N = "N")
 
-  first_g <- logical(length(ga))
   has_clip <- clen > 0
-
   plus_clip  <- is_plus & has_clip
   minus_clip <- !is_plus & has_clip
 
+  # Get first 5' base for single soft-clips
+  first_base <- character(length(ga))
   if (any(plus_clip)) {
-    first_g[plus_clip] <- substr(seq_str[plus_clip], 1, 1) == "G"
+    first_base[plus_clip] <- substr(seq_str[plus_clip], 1, 1)
   }
   if (any(minus_clip)) {
-    last_chars           <- substr(seq_str[minus_clip],
-                                   nchar(seq_str[minus_clip]),
-                                   nchar(seq_str[minus_clip]))
-    first_g[minus_clip]  <- last_chars == "C"  # original 5' G stored as C after RC
+    last_chars <- substr(seq_str[minus_clip],
+                         nchar(seq_str[minus_clip]),
+                         nchar(seq_str[minus_clip]))
+    first_base[minus_clip] <- comp[last_chars]  # reverse complement
   }
 
-  # Check if all 3 bases are G for 3Sggg classification
-  all_three_g <- logical(length(ga))
+  # Check if first 2 bases are GG for 2Sgg
+  first_two_gg <- logical(length(ga))
+  len2_clip <- clen == 2 & has_clip
+  if (any(len2_clip & is_plus)) {
+    idx <- which(len2_clip & is_plus)
+    first_two_gg[idx] <- substr(seq_str[idx], 1, 2) == "GG"
+  }
+  if (any(len2_clip & !is_plus)) {
+    idx <- which(len2_clip & !is_plus)
+    last2 <- substr(seq_str[idx], nchar(seq_str[idx]) - 1, nchar(seq_str[idx]))
+    first_two_gg[idx] <- last2 == "CC"  # original 5' GG stored as CC after RC
+  }
+
+  # Check if first 3 bases are GGG for 3Sggg
+  first_three_ggg <- logical(length(ga))
   len3_clip <- clen == 3 & has_clip
   if (any(len3_clip & is_plus)) {
     idx <- which(len3_clip & is_plus)
-    all_three_g[idx] <- substr(seq_str[idx], 1, 3) == "GGG"
+    first_three_ggg[idx] <- substr(seq_str[idx], 1, 3) == "GGG"
   }
   if (any(len3_clip & !is_plus)) {
     idx <- which(len3_clip & !is_plus)
     last3 <- substr(seq_str[idx], nchar(seq_str[idx]) - 2, nchar(seq_str[idx]))
-    all_three_g[idx] <- last3 == "CCC"  # original 5' GGG stored as CCC after RC
+    first_three_ggg[idx] <- last3 == "CCC"  # original 5' GGG stored as CCC after RC
   }
 
-  # Assign type
+  # Assign type with granular categories
   type <- character(length(ga))
-  type[clen == 0]                   <- "M"
-  type[clen == 1 & first_g]         <- "1Sg"
-  type[clen == 2 & first_g]         <- "2Sgg"
-  type[clen == 3 & all_three_g]     <- "3Sggg"
-  type[type == ""]                  <- "other"
+  type[clen == 0]                        <- "M"
+  type[clen == 1 & first_base == "G"]    <- "1Sg"
+  type[clen == 1 & first_base == "A"]    <- "1Sa"
+  type[clen == 1 & first_base == "T"]    <- "1St"
+  type[clen == 1 & first_base == "C"]    <- "1Sc"
+  type[clen == 2 & first_two_gg]         <- "2Sgg"
+  type[clen == 3 & first_three_ggg]      <- "3Sggg"
+  type[type == ""]                       <- "other"
 
   # Aggregate: (chr, pos, strand, type) → count
   dt <- data.table(
@@ -149,13 +165,14 @@ bam_to_typed_ctss <- function(bam_path, sample_id) {
   wide <- dcast(agg, chr + pos + strand ~ type, value.var = "n", fill = 0L)
 
   # Ensure all type columns present
-  for (col in c("1Sg", "2Sgg", "3Sggg", "M", "other")) {
+  all_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M", "other")
+  for (col in all_types) {
     if (!col %in% colnames(wide)) wide[[col]] <- 0L
   }
 
-  wide[, n_total := `1Sg` + `2Sgg` + `3Sggg` + M + other]
-  setnames(wide, c("1Sg", "2Sgg", "3Sggg", "M", "other"),
-           c("n_1Sg", "n_2Sgg", "n_3Sggg", "n_M", "n_other"))
+  wide[, n_total := `1Sg` + `2Sgg` + `3Sggg` + `1Sa` + `1St` + `1Sc` + M + other]
+  setnames(wide, all_types,
+           paste0("n_", all_types))
   wide[, sample_id := sample_id]
 
   wide
