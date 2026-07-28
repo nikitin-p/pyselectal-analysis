@@ -13,8 +13,8 @@
 #       [--outdir   results/motifs]                \
 #       [--figdir   results/figures]               \
 #       [--max_pos  5000]                          \
-#       [--upstream 50]                            \
-#       [--downstream 10]                          \
+#       [--upstream 20]                            \
+#       [--downstream 20]                          \
 #       [--promoter_only]                          \
 #       [--yr_only]                                \
 #       [--force]
@@ -74,8 +74,8 @@ gtf_f        <- get_arg("--gtf",        "data/sacCer3.ensGene.gtf")
 outdir       <- get_arg("--outdir",     "results/motifs")
 figdir       <- get_arg("--figdir",     "results/figures")
 max_pos      <- as.integer(get_arg("--max_pos", "5000"))
-upstream     <- as.integer(get_arg("--upstream", "50"))
-downstream   <- as.integer(get_arg("--downstream", "10"))
+upstream     <- as.integer(get_arg("--upstream", "20"))
+downstream   <- as.integer(get_arg("--downstream", "20"))
 promoter_only <- has_flag("--promoter_only")
 yr_only       <- has_flag("--yr_only")
 force         <- has_flag("--force")
@@ -299,8 +299,8 @@ p_logo <- ggseqlogo(logo_data, method = "bits", ncol = 1) +
   theme_minimal(base_size = 10) +
   theme(strip.text = element_text(face = "bold", size = 11)) +
   scale_x_continuous(
-    breaks = seq(1, upstream + 1 + downstream, by = 10),
-    labels = pos_labels[seq(1, length(pos_labels), by = 10)]
+    breaks = seq(1, upstream + 1 + downstream, by = 5),
+    labels = pos_labels[seq(1, length(pos_labels), by = 5)]
   ) +
   labs(x = "Position relative to TSS", y = "Bits")
 

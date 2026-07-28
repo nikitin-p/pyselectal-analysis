@@ -44,6 +44,12 @@ force           <- "--force" %in% args
 
 dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
 
+# fmt_n(): compact count labels drawn on top of every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 out_heat   <- file.path(outdir, "08_tss_heatmap_pct1Sg.pdf")
 out_box    <- file.path(outdir, "08_initiator_boxplot.pdf")
 out_stack  <- file.path(outdir, "08_initiator_stacked.pdf")
@@ -179,14 +185,24 @@ stack_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg),
 
 stack_dat$initiator <- factor(stack_dat$initiator, levels = init_order$initiator)
 
+# Each bar averages one percentage per cluster x condition, so the count that
+# qualifies it is the number of those observations, not a read count.
+stack_n <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg), .N, by = initiator] |>
+  as.data.frame() |>
+  mutate(initiator = factor(initiator, levels = init_order$initiator))
+
 type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7",
                  "M"   = "#06d6a0", "other" = "#adb5bd")
 
 p_stack <- ggplot(stack_dat, aes(x = initiator, y = pct, fill = end_type)) +
   geom_bar(stat = "identity", position = "stack", colour = "white", linewidth = 0.2) +
+  geom_text(data = stack_n, aes(x = initiator, y = 101, label = fmt_n(N)),
+            inherit.aes = FALSE, vjust = 0, size = 2.5, colour = "grey25") +
   scale_fill_manual(values = type_colors, name = "End type") +
+  scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 108)) +
   labs(
     title = "Mean 5′-end type composition by initiator",
+    subtitle = "Labels give the number of TSS cluster × condition observations averaged",
     x = "Initiator (TSS−1 | TSS)", y = "Mean % reads"
   ) +
   theme_bw(base_size = 11) +

@@ -111,6 +111,12 @@ if (!force && file.exists(out_main)) {
 YR_RED   <- "#e63946"   # canonical initiator colour (project convention)
 OTHER_GY <- "#6c757d"
 
+# fmt_n(): compact count labels drawn on top of every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 # ── genome loading ────────────────────────────────────────────────────────────
 load_genome <- function(genome_spec) {
   if (grepl("\\.(fa|fasta)(\\.gz)?$", genome_spec, ignore.case = TRUE)) {
@@ -208,11 +214,18 @@ g_all <- geo_of(lad); g_cln <- geo_of(clean)
 
 cat("\n=== A. Global added-G ladder (positions with depth >=", min_depth, ") ===\n")
 print(global_tab, row.names = FALSE)
-cat("\n  Geometric test - a pure per-step RT slip predicts p3/p2 == p2/p1 (ratio 1.0):\n")
+cat("\n  Step ratios (see the WARNING below before interpreting these):\n")
 cat(sprintf("    all positions      p2/p1=%.5f  p3/p2=%.5f  ratio=%.2f\n",
             g_all[["q1"]], g_all[["q2"]], g_all[["ratio"]]))
 cat(sprintf("    outliers removed   p2/p1=%.5f  p3/p2=%.5f  ratio=%.2f\n",
             g_cln[["q1"]], g_cln[["q2"]], g_cln[["ratio"]]))
+cat("\n  WARNING: do NOT read ratio != 1 as evidence that the additions are\n")
+cat("  non-independent. Two reasons:\n")
+cat("   (1) The first G is cap-derived while the extra G's come from terminal\n")
+cat("       transferase, so p2/p1 and p3/p2 measure different mechanisms and\n")
+cat("       there is no reason for them to be equal in the first place.\n")
+cat("   (2) Pooling positions with different rates inflates p3/p2 relative to\n")
+cat("       p2/p1 all by itself. Section E stratifies to remove this.\n")
 
 # ── B. is the per-position rate constant? (overdispersion) ────────────────────
 # Under a single global rate p_extra, x_extra ~ Binomial(depth, p_extra).
@@ -333,6 +346,45 @@ print(per_sample[, .(sample_id, condition, depth, extra_G_rate = round(extra_G_r
                      step_p2_p1 = round(step_p2_p1, 5), step_p3_p2 = round(step_p3_p2, 5))],
       row.names = FALSE)
 
+# ── E. does position heterogeneity explain the step ratios? ───────────────────
+# Strata are defined on replicate 1 and the ratios measured on replicate 2, so
+# positions are not selected on the same counts used to score them.
+rep_dt <- copy(ctss)
+rep_dt[, rep := sub(".*_(r[0-9]+)$", "\\1", sample_id)]
+strat_tab <- NULL
+if (uniqueN(rep_dt$rep) == 2) {
+  w <- dcast(rep_dt, chr + pos + strand ~ rep,
+             value.var = ladder_cols, fun.aggregate = sum)
+  r <- sort(unique(rep_dt$rep))
+  w[, d1 := rowSums(.SD), .SDcols = paste0(ladder_cols, "_", r[1])]
+  w[, d2 := rowSums(.SD), .SDcols = paste0(ladder_cols, "_", r[2])]
+  w <- w[d1 >= min_depth & d2 >= min_depth]
+  w[, rate1 := (get(paste0("n_2Sgg_", r[1])) + get(paste0("n_3Sggg_", r[1]))) / d1]
+  w <- w[rate1 <= outlier_rate]
+  w[, stratum := cut(rate1, c(-1e-9, .005, .01, .02, .04, .08, outlier_rate),
+                     labels = c("0-0.5%", "0.5-1%", "1-2%", "2-4%", "4-8%",
+                                paste0("8-", 100 * outlier_rate, "%")))]
+  strat_tab <- w[, .(positions = .N,
+                     p2_p1 = sum(get(paste0("n_2Sgg_",  r[2]))) / sum(get(paste0("n_1Sg_",  r[2]))),
+                     p3_p2 = sum(get(paste0("n_3Sggg_", r[2]))) / sum(get(paste0("n_2Sgg_", r[2])))),
+                 by = stratum][order(stratum)]
+  strat_tab[, ratio := p3_p2 / p2_p1]
+  write_tsv(strat_tab, file.path(outdir, "step_ratio_by_stratum.tsv"))
+
+  cat("\n=== E. Step ratios within homogeneous strata ===\n")
+  cat("  (strata from replicate 1, ratios measured in replicate 2)\n")
+  print(strat_tab[, .(stratum, positions, p2_p1 = round(p2_p1, 4),
+                      p3_p2 = round(p3_p2, 4), ratio = round(ratio, 2))], row.names = FALSE)
+  cat("\n  If 'ratio' varies strongly across strata and crosses 1.0, the pooled\n")
+  cat("  ratio in section A is a mixture artifact of position heterogeneity and\n")
+  cat("  carries no information about dependence between successive additions.\n")
+  cat("  Note that p2/p1 varies far more across strata than p3/p2 does: positions\n")
+  cat("  differ mainly in WHETHER extra-G addition happens at all, much less in\n")
+  cat("  whether it continues once started.\n")
+} else {
+  message("  (section E skipped: expected exactly 2 replicates per condition)")
+}
+
 # ── figures ───────────────────────────────────────────────────────────────────
 message("\nWriting figures...")
 
@@ -373,12 +425,16 @@ init_plot[, initiator := factor(initiator, levels = initiator[order(-extra_G_rat
 p3 <- ggplot(init_plot, aes(x = initiator, y = extra_G_rate, fill = is_YR)) +
   geom_col() +
   geom_hline(yintercept = p_extra, linetype = "dashed") +
+  # after the reference line, so a label that lands on it stays readable
+  geom_text(aes(label = fmt_n(reads)), vjust = -0.4, size = 2.3, colour = "grey25") +
   scale_fill_manual(values = c("TRUE" = YR_RED, "FALSE" = OTHER_GY),
                     labels = c("TRUE" = "YR (canonical)", "FALSE" = "other"), name = NULL) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
   theme_minimal(base_size = 10) +
   labs(x = "Initiator dinucleotide (-1, +1)", y = "extra-G rate",
        title = "Extra-G rate by initiator dinucleotide",
-       subtitle = "Dashed line = global rate; initiators with >= 1000 ladder reads") +
+       subtitle = paste("Dashed line = global rate; initiators with >= 1000 ladder reads.",
+                        "Labels give the ladder reads per initiator.")) +
   theme(legend.position = "bottom")
 ggsave(file.path(figdir, "13_gladder_by_initiator.pdf"), p3, width = 8, height = 4.5)
 
@@ -386,15 +442,22 @@ ggsave(file.path(figdir, "13_gladder_by_initiator.pdf"), p3, width = 8, height =
 ps_long <- melt(per_sample, id.vars = c("sample_id", "condition"),
                 measure.vars = c("step_p2_p1", "step_p3_p2"),
                 variable.name = "step", value.name = "ratio")
+ps_n <- per_sample[, .(sample_id, condition, depth,
+                       ytop = pmax(step_p2_p1, step_p3_p2, na.rm = TRUE))]
+
 p4 <- ggplot(ps_long, aes(x = sample_id, y = ratio, fill = step)) +
   geom_col(position = "dodge") +
+  geom_text(data = ps_n, aes(x = sample_id, y = ytop, label = fmt_n(depth)),
+            inherit.aes = FALSE, vjust = -0.6, size = 2.3, colour = "grey25") +
   facet_wrap(~condition, scales = "free_x", nrow = 1) +
   scale_fill_manual(values = c(step_p2_p1 = YR_RED, step_p3_p2 = OTHER_GY),
                     labels = c("2Sgg / 1Sg", "3Sggg / 2Sgg"), name = NULL) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
   theme_minimal(base_size = 10) +
   labs(x = NULL, y = "Step ratio",
        title = "Added-G ladder step ratios across samples and conditions",
-       subtitle = "Equal bars within a sample support a geometric (constant-probability) process") +
+       subtitle = paste("Equal bars within a sample support a geometric (constant-probability) process.",
+                        "Labels give the ladder depth per sample.")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
 ggsave(file.path(figdir, "13_gladder_by_sample.pdf"), p4, width = 10, height = 4.5)
 

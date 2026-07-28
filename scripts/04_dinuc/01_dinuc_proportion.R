@@ -52,6 +52,12 @@ dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
 
 params <- yaml.load_file(params_f)
 
+# fmt_n(): compact count labels drawn next to every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 # ── genome loading ────────────────────────────────────────────────────────────
 # Returns either a BSgenome object or an open FaFile (for custom / test FASTA).
 load_genome <- function(genome_spec) {
@@ -222,8 +228,11 @@ process_sample <- function(sample_id, bam_path, genome_spec, outdir, force) {
 
   p <- ggplot(props, aes(x = dinucleotide, y = proportion * 100, fill = is_canonical)) +
     geom_bar(stat = "identity", colour = "grey30", linewidth = 0.25) +
+    geom_text(aes(label = fmt_n(sum_score)), hjust = -0.15, size = 2.4, colour = "grey25") +
     scale_fill_manual(values = c("TRUE" = "#e63946", "FALSE" = "#4cc9f0"), guide = "none") +
-    ggtitle(paste0("Initiator dinucleotide proportion\n", sample_id)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.18))) +
+    ggtitle(paste0("Initiator dinucleotide proportion\n", sample_id,
+                   "\nBar labels: summed CTSS score (alignments)")) +
     xlab("Dinucleotide (CTSS ±1 bp)") +
     ylab("% of total score") +
     coord_flip() +
@@ -299,11 +308,25 @@ if (length(results) > 0) {
                        "#3a0ca3", "#f3722c", "#43aa8b", "#277da1"))(n_samples)
   }
 
+  # One label per dinucleotide rather than per bar: 16 x n_samples individual
+  # labels would be unreadable, and the pooled score is what sets the scale.
+  dinuc_totals <- combined |>
+    group_by(dinucleotide) |>
+    summarise(n = sum(sum_score, na.rm = TRUE),
+              ytop = max(proportion, na.rm = TRUE) * 100,
+              .groups = "drop")
+
   p_combined <- ggplot(combined,
       aes(x = dinucleotide, y = proportion * 100, fill = sample)) +
     geom_bar(stat = "identity", position = position_dodge(preserve = "single"),
              colour = "grey30", linewidth = 0.15) +
+    geom_text(data = dinuc_totals,
+              aes(x = dinucleotide, y = ytop, label = fmt_n(n)),
+              inherit.aes = FALSE, hjust = -0.15, size = 2.4, colour = "grey25") +
     scale_fill_manual(values = pal) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.18))) +
+    ggtitle("Initiator dinucleotide proportion, all samples",
+            subtitle = "Labels: summed CTSS score (alignments) pooled across samples") +
     xlab("Dinucleotide (CTSS ±1 bp)") +
     ylab("% of total score") +
     coord_flip() +

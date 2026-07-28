@@ -22,6 +22,12 @@ rename_samples <- function(x) {
   x
 }
 
+# fmt_n(): compact count labels drawn on top of every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 # Paths
 results_dir <- "results"
 fig_dir <- file.path(results_dir, "figures")
@@ -32,25 +38,29 @@ dinuc_all <- read.delim(file.path(results_dir, "dinuc_all", "all_dinuc_proportio
 dinuc_1Sg <- read.delim(file.path(results_dir, "dinuc_1Sg", "all_dinuc_proportions.tsv"))
 dinuc_2Sgg <- read.delim(file.path(results_dir, "dinuc_2Sgg", "all_dinuc_proportions.tsv"))
 dinuc_3Sggg <- read.delim(file.path(results_dir, "dinuc_3Sggg", "all_dinuc_proportions.tsv"))
-dinuc_other <- read.delim(file.path(results_dir, "dinuc_other_soft_clipped", "all_dinuc_proportions.tsv"))
+# All 5'-soft-clipped reads (pyselectal spec "S"); other_soft_clipped is derived
+# from this as the residual after removing the 1Sg / 2Sgg / 3Sggg subsets.
+dinuc_soft <- read.delim(file.path(results_dir, "dinuc_S", "all_dinuc_proportions.tsv"))
 
 # Rename sum_score columns and join
 dinuc_all <- dinuc_all %>% select(sample, dinucleotide, n_all = sum_score)
 dinuc_1Sg <- dinuc_1Sg %>% select(sample, dinucleotide, n_1Sg = sum_score)
 dinuc_2Sgg <- dinuc_2Sgg %>% select(sample, dinucleotide, n_2Sgg = sum_score)
 dinuc_3Sggg <- dinuc_3Sggg %>% select(sample, dinucleotide, n_3Sggg = sum_score)
-dinuc_other <- dinuc_other %>% select(sample, dinucleotide, n_other = sum_score)
+dinuc_soft <- dinuc_soft %>% select(sample, dinucleotide, n_soft = sum_score)
 
 # Combine - use left join from dinuc_all to keep all dinucleotides
 combined <- dinuc_all %>%
   left_join(dinuc_1Sg, by = c("sample", "dinucleotide")) %>%
   left_join(dinuc_2Sgg, by = c("sample", "dinucleotide")) %>%
   left_join(dinuc_3Sggg, by = c("sample", "dinucleotide")) %>%
-  left_join(dinuc_other, by = c("sample", "dinucleotide")) %>%
-  replace_na(list(n_1Sg = 0, n_2Sgg = 0, n_3Sggg = 0, n_other = 0)) %>%
+  left_join(dinuc_soft, by = c("sample", "dinucleotide")) %>%
+  replace_na(list(n_1Sg = 0, n_2Sgg = 0, n_3Sggg = 0, n_soft = 0)) %>%
   mutate(
-    n_M = n_all - n_1Sg - n_2Sgg - n_3Sggg - n_other,
-    n_M = pmax(n_M, 0)  # safety
+    # Rare soft-clip types: everything soft-clipped that is not 1Sg / 2Sgg / 3Sggg
+    n_other = pmax(n_soft - n_1Sg - n_2Sgg - n_3Sggg, 0),
+    # Mapped starts: everything with no 5' soft-clip at all
+    n_M = pmax(n_all - n_soft, 0)
   )
 
 # Calculate proportions within each dinucleotide
@@ -117,10 +127,15 @@ axis_colors <- ifelse(agg_by_dinuc$dinucleotide %in% yr_dinucs, "#e63946", "blac
 
 p1 <- ggplot(agg_long, aes(x = dinucleotide, y = percentage, fill = end_type)) +
   geom_bar(stat = "identity", position = "stack") +
+  geom_text(data = agg_by_dinuc,
+            aes(x = dinucleotide, y = 101, label = fmt_n(total)),
+            inherit.aes = FALSE, vjust = 0, size = 2.5, colour = "grey25") +
   scale_fill_manual(values = end_type_colors, name = "End type") +
+  scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 108)) +
   labs(
     title = "End-type distribution by initiator dinucleotide",
-    subtitle = "Ordered by total expression (left = highest); YR initiators in red",
+    subtitle = paste0("Ordered by total expression (left = highest); YR initiators in red.\n",
+                      "Labels give the total number of reads at each initiator."),
     x = "Initiator dinucleotide",
     y = "Percentage of reads"
   ) +

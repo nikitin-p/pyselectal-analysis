@@ -43,6 +43,12 @@ params <- yaml.load_file(params_f)
 chisq_min_count <- params$chisq_min_count %||% 5
 `%||%` <- function(a, b) if (!is.null(a)) a else b
 
+# fmt_n(): compact count labels drawn on top of every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 # ── dinucleotide classification ───────────────────────────────────────────────
 # Positions are CTSS ±1 bp (strand-aware): first base = −1, second base = +1
 # Y = pyrimidine (C/T), R = purine (A/G)
@@ -88,14 +94,22 @@ cat_levels <- c("YR", "YC", "other")
 sample_cat$category <- factor(sample_cat$category, levels = cat_levels)
 
 # ── Figure 1: per-sample YR/YC/other stacked bar, faceted by end_type ─────────
+bar_n <- sample_cat |>
+  group_by(sample_id, end_type) |>
+  summarise(n = sum(count), .groups = "drop")
+
 p_bar <- ggplot(sample_cat,
                 aes(x = sample_id, y = proportion, fill = category)) +
   geom_col() +
+  geom_text(data = bar_n, aes(x = sample_id, y = 1.02, label = fmt_n(n)),
+            inherit.aes = FALSE, vjust = 0, size = 2.3, colour = "grey25") +
   facet_wrap(~ end_type, ncol = 1) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1),
+                     breaks = seq(0, 1, 0.25), limits = c(0, 1.12)) +
   scale_fill_manual(values = c("YR" = "#E64B35", "YC" = "#4DBBD5",
                                 "other" = "#B2B2B2")) +
   labs(title = "Dinucleotide category proportions per sample",
+       subtitle = "Labels give the summed CTSS score (alignments) behind each bar",
        x = NULL, y = "Proportion", fill = NULL) +
   theme_bw(base_size = 11) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
@@ -113,17 +127,27 @@ yr_cond <- sample_cat |>
             n         = n(),
             .groups = "drop")
 
+# Total score behind each bar, pooled over the replicates that the mean averages.
+cond_n <- sample_cat |>
+  group_by(end_type, condition) |>
+  summarise(n_score = sum(count), .groups = "drop")
+yr_cond <- left_join(yr_cond, cond_n, by = c("end_type", "condition"))
+
 p_cond <- ggplot(yr_cond,
                  aes(x = condition, y = mean_prop, fill = end_type)) +
   geom_col(position = position_dodge(0.7), width = 0.6) +
   geom_errorbar(aes(ymin = mean_prop - sd_prop,
                     ymax = mean_prop + sd_prop),
                 position = position_dodge(0.7), width = 0.2) +
+  geom_text(aes(y = mean_prop + sd_prop, label = fmt_n(n_score)),
+            position = position_dodge(0.7), vjust = -0.6, size = 2.3,
+            colour = "grey25", show.legend = FALSE) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
-                     limits = c(0, 1)) +
+                     breaks = seq(0, 1, 0.25), limits = c(0, 1.1)) +
   scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sgg" = "#F39B7F",
                                 "3Sggg" = "#F5B041", "all" = "#4DBBD5")) +
   labs(title = "YR proportion by condition",
+       subtitle = "Labels give the summed CTSS score (alignments) pooled over replicates",
        x = NULL, y = "YR proportion (mean ± SD across replicates)",
        fill = "End type") +
   theme_bw(base_size = 11) +

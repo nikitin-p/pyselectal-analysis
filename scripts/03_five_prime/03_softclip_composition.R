@@ -56,6 +56,12 @@ rt_prefs_df <- tibble(
 # ── helpers ───────────────────────────────────────────────────────────────────
 NUC_COLORS <- c(A = "#4DAF4A", C = "#377EB8", G = "#FF7F00", T = "#E41A1C")
 
+# fmt_n(): compact alignment-count labels drawn on top of every histogram bar
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
+       else "scripts/utils/plot_helpers.R")
+
 # Extract the lowercase-base suffix from a soft-clip type label.
 # "2Sgc" -> "gc",  "1Sg" -> "g",  "36Mctcac" -> NA
 parse_softclip_bases <- function(type) {
@@ -146,17 +152,27 @@ pooled_plot_df <- pooled_freq |>
     nucleotide = factor(nucleotide, levels = c("A", "C", "G", "T"))
   )
 
+# Number of soft-clipped bases behind each stacked column. The literature panel
+# is not backed by data, so it gets an empty label.
+pooled_n <- pooled_plot_df |>
+  group_by(position_label) |>
+  summarise(n = sum(count, na.rm = TRUE), .groups = "drop") |>
+  mutate(label = ifelse(n > 0, fmt_n(n), ""))
+
 p_pooled <- ggplot(pooled_plot_df,
                    aes(x = position_label, y = freq, fill = nucleotide)) +
   geom_col(width = 0.7) +
+  geom_text(data = pooled_n, aes(x = position_label, y = 1.02, label = label),
+            inherit.aes = FALSE, vjust = 0, size = 2.8, colour = "grey25") +
   geom_vline(xintercept = length(unique(pooled_freq$position)) + 0.5,
              linetype = "dashed", colour = "grey50", linewidth = 0.4) +
   scale_fill_manual(values = NUC_COLORS) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
-                     limits = c(0, 1), expand = c(0, 0)) +
+                     breaks = seq(0, 1, 0.25), limits = c(0, 1.1), expand = c(0, 0)) +
   labs(
     title    = "Nucleotide composition of non-1Sg soft-clipped bases",
-    subtitle = "Pooled across all samples | dashed line separates data from literature reference",
+    subtitle = paste0("Pooled across all samples | dashed line separates data from literature reference\n",
+                      "Labels give the number of soft-clipped bases at each position"),
     x        = NULL,
     y        = "Frequency",
     fill     = "Nucleotide"
@@ -180,15 +196,22 @@ sample_freq     <- position_freqs(sample_expanded) |>
 
 n_samples <- length(unique(sample_freq$sample_id))
 
+sample_n <- sample_freq |>
+  group_by(sample_id, position_label) |>
+  summarise(n = sum(count, na.rm = TRUE), .groups = "drop")
+
 p_by_sample <- ggplot(sample_freq,
                       aes(x = position_label, y = freq, fill = nucleotide)) +
   geom_col(width = 0.7) +
+  geom_text(data = sample_n, aes(x = position_label, y = 1.02, label = fmt_n(n)),
+            inherit.aes = FALSE, vjust = 0, size = 2.3, colour = "grey25") +
   scale_fill_manual(values = NUC_COLORS) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
-                     limits = c(0, 1), expand = c(0, 0)) +
+                     breaks = seq(0, 1, 0.25), limits = c(0, 1.12), expand = c(0, 0)) +
   facet_wrap(~ sample_id, ncol = 3) +
   labs(
     title = "Non-1Sg soft-clip nucleotide composition per sample",
+    subtitle = "Labels give the number of soft-clipped bases at each position",
     x     = NULL,
     y     = "Frequency",
     fill  = "Nucleotide"

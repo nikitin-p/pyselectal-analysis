@@ -213,10 +213,18 @@ if (!all(is.na(dt$annotation))) {
     intergenic      = "#adb5bd"
   )
 
+  annot_n <- annot_dat |>
+    group_by(hclust_group) |>
+    summarise(n = sum(n), .groups = "drop")
+
   p_annot <- ggplot(annot_dat, aes(x = hclust_group, y = pct, fill = annotation)) +
     geom_bar(stat = "identity", position = "stack", colour = "white", linewidth = 0.25) +
+    geom_text(data = annot_n, aes(x = hclust_group, y = 102, label = paste0("n=", n)),
+              inherit.aes = FALSE, size = 3, vjust = 0) +
     scale_fill_manual(values = annot_colors, name = "Annotation") +
+    scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 110), expand = c(0, 0)) +
     labs(title = "Gene annotation per TSS cluster",
+         subtitle = "Labels give the number of annotated TSS in each cluster",
          x = "Cluster", y = "% TSS") +
     theme_bw(base_size = 11) +
     theme(panel.grid.minor = element_blank())
@@ -241,6 +249,12 @@ if (!all(is.na(dt$initiator))) {
            hclust_group = factor(hclust_group, levels = group_levels)) |>
     ungroup()
 
+  # Counted before the rare-initiator filter below, so the label reports every
+  # TSS with a called initiator, not only the ones drawn.
+  init_n <- init_dat |>
+    group_by(hclust_group) |>
+    summarise(n = sum(n), .groups = "drop")
+
   # Keep initiators present in ≥1% of any group
   keep_init <- init_dat |>
     group_by(initiator) |>
@@ -251,7 +265,11 @@ if (!all(is.na(dt$initiator))) {
 
   p_init <- ggplot(init_dat, aes(x = hclust_group, y = pct, fill = initiator)) +
     geom_bar(stat = "identity", position = "stack", colour = "white", linewidth = 0.25) +
+    geom_text(data = init_n, aes(x = hclust_group, y = 102, label = paste0("n=", n)),
+              inherit.aes = FALSE, size = 3, vjust = 0) +
+    scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 110), expand = c(0, 0)) +
     labs(title = "Initiator dinucleotide composition per TSS cluster",
+         subtitle = "Labels give the number of TSS with a called initiator in each cluster",
          x = "Cluster", y = "% TSS") +
     theme_bw(base_size = 11) +
     theme(panel.grid.minor = element_blank())
