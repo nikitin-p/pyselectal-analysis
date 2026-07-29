@@ -125,4 +125,8 @@ $RSCRIPT "$ROOT_DIR/scripts/04_dinuc/02_yr_enrichment.R" \
 log_info "Stages 8+9: TSS end-type matrix and clustering"
 bash "$ROOT_DIR/scripts/05_tss_end_types/run.sh" $FORCE_FLAG
 
+# ── Stage 14: HTML analysis report ───────────────────────────────────────────
+log_info "Stage 14: HTML analysis report"
+bash "$ROOT_DIR/scripts/07_report/run.sh" $FORCE_FLAG
+
 log_info "All stages complete."

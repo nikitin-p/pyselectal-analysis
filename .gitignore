@@ -23,3 +23,4 @@ config/samples_M.tsv
 config/samples_other_soft_clipped.tsv
 Rplots.pdf
 config/samples_S.tsv
+reports/

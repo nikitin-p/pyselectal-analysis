@@ -254,6 +254,30 @@ The distribution of reads in repetitive vs unique regions is characterized; TLDR
 
 ---
 
+### Stage 14 — HTML analysis report
+
+**Scripts:** `scripts/07_report/run.sh`  
+**Status:** The report is complete for the yeast dataset.  
+**Input:** The summary tables written by stages 3–10, namely `results/five_prime/`, `results/dinuc_all/`, `results/dinuc_1Sg/`, `results/tss/`, `results/localization/`, `results/motifs/`, `results/g_ladder/`, `results/dinuc_position/`, and `results/figures/*.tsv`.  
+**Output:** The rendered document is written to `reports/cage_5prime_report.html`.
+
+The source document is `reports/cage_5prime_report.qmd`. It renders to a single self-contained HTML file with an embedded table of contents, and it covers the whole yeast analysis in twelve sections. Each section states in prose how the quantity was computed, presents the figure, and then gives the biological reading; the document closes with a ranked synthesis and an explicit statement of what the analysis cannot settle.
+
+The report regenerates every figure at render time from the pipeline's own summary tables rather than embedding the PDF files produced by the individual stage scripts. This choice has three consequences worth noting:
+
+- the rendered HTML is fully self-contained and can be shared as a single file;
+- the report cannot drift away from the analysis that it describes, because it reads the same tables;
+- no BAM file is opened, so the stage runs in well under a minute and can be re-run freely.
+
+The stage requires Quarto on `PATH` and an R installation with `data.table`, `ggplot2`, `dplyr`, `tidyr`, `scales`, `patchwork`, `pheatmap`, `Biostrings`, `ggseqlogo`, `ggdendro`, and `knitr`. It does not require the `r_cage` conda environment.
+
+```bash
+bash scripts/07_report/run.sh           # skips if the HTML already exists
+bash scripts/07_report/run.sh --force   # re-renders unconditionally
+```
+
+---
+
 ## Repo layout
 
 ```text
@@ -279,6 +303,7 @@ results/
   annotation/           ChIPseeker output
   expression/           (Stage 11) TSS cluster expression dynamics
   figures/              all PDFs and TSVs from analysis scripts
+reports/                cage_5prime_report.qmd and the rendered HTML report
 scripts/
   00_setup/             test BAM generation
   01_map/               STAR mapping wrapper
@@ -289,6 +314,7 @@ scripts/
   06_localization/      genomic localization by end type (ChIPseeker/TxDb annotation)
   07_cager/             (scripted) CAGEr promoter clusters, gene-type enrichment
   07_expression/        (planned) TSS cluster expression dynamics
+  07_report/            Quarto HTML report rendering
   99_additional/        (planned) repeats, TLDR-seq
   utils/                log.sh, parse_yaml.sh
 logs/                   per-script timestamped logs
