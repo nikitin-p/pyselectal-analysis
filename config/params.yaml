@@ -5,7 +5,6 @@
 # hg38:    GENCODE (GRCh38 primary assembly; download from gencodegenes.org)
 star_index_hg38:    ""   # TODO: fill in after GENCODE genome is downloaded
 star_index_saccer3: "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_saccer3"
-star_index_cenpk:   "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_cenpk"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 pyselectal: "pyselectal.py"          # path to pyselectal.py
@@ -32,10 +31,14 @@ subsample_factor: 0.95             # target = floor(0.95 × min(retained depths)
 collapse_threshold: 0.1    # collapse categories below 0.1 % of total into 'other'
 mapped_prefix: 5           # bases of matched sequence to show for M-type ends
 
-# ── Annotation BED files (absolute paths on the VM; leave empty if not yet available)
-# sacCer3: use CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019 (custom yeast assembly)
+# ── Annotation BED files ─────────────────────────────────────────────────────
+# sacCer3: gene-level BED6 derived from data/sacCer3.ensGene.gtf by
+#          scripts/00_setup/make_yeast_gene_bed.sh. The name column holds the
+#          systematic ORF name, which org.Sc.sgd.db indexes directly.
+#          The project uses the standard sacCer3 reference; the CEN.PK113-7D
+#          annotation from Börlin et al. 2019 is no longer used.
 # hg38:    will use GENCODE GTF/BED after annotation source is finalised
-annotation_bed_yeast: ""   # CENPK113-7D_GeneAnnotation.bed from Börlin et al. 2019
+annotation_bed_yeast: "data/sacCer3.genes.bed"
 annotation_bed_hg38:  ""   # TODO: fill in after hg38 GENCODE annotation decision
 
 # ── Stage 10: CAGEr ───────────────────────────────────────────────────────────
@@ -46,6 +49,27 @@ cager_keep_singletons_above:  5       # distclu keepSingletonsAbove
 cager_iqw_qlow:               0.1     # lower quantile for IQW
 cager_iqw_qup:                0.9     # upper quantile for IQW
 cager_iqw_tpm_threshold:      3       # tpmThreshold for plotInterquantileWidth
+
+# ── Stage 08: seqArchR sequence architectures ────────────────────────────────
+# Window is asymmetric because the yeast TATA box sits unusually far upstream
+# (roughly 40-120 bp before the TSS), so 150 bp upstream captures it while
+# 50 bp downstream covers the initiator region.
+seqarchr_upstream:   150     # bp upstream of the dominant TSS
+seqarchr_downstream: 50      # bp downstream of the dominant TSS
+seqarchr_min_total:  2       # mean_total floor for including a TSS cluster
+seqarchr_total_itr:  4       # seqArchR iterations
+seqarchr_chunk_size: 500     # sequences per NMF chunk
+seqarchr_cv_folds:   5       # cross-validation folds for choosing K per chunk
+seqarchr_n_cores:    6       # parallel workers
+# Number of architectures to collate the raw seqArchR clusters into. The final
+# seqArchR iteration is uncollated, so chunks where NMF chose K=1 survive as
+# clusters of exactly chunk_size; collation merges them. The value is chosen from
+# where the collation dendrogram's merge heights flatten (see
+# results/seqarchr/arch_dendrogram_heights.tsv), never from the end-type labels —
+# picking the cut that maximises the association would make the test circular.
+seqarchr_n_arch:     8
+seqarchr_seed:       42
+conda_env_seqarchr:  "seqarchr"   # conda env with scikit-learn for the reticulate backend
 
 # ── Stage 11: expression dynamics ────────────────────────────────────────────
 expr_min_pct_1Sg: 70                  # % 1Sg threshold for "high-1Sg" cluster selection
@@ -71,3 +95,56 @@ rt_nontemplated_prefs:
   C: 0.50
   G: 0.25
   T: 0.15
+
+# ── Stage 16: GO Biological Process enrichment ───────────────────────────────
+# Foreground sets are defined by a per-type quantile rather than by one fixed
+# percentage, because the global end-type shares are extremely uneven (1Sg is
+# about 74 % of reads and 1Sa well under 1 %), so any single cutoff is either
+# met by nearly every TSS or by none.
+results_go:           "results/go"
+go_quantile:          0.90    # quantile of pct_T defining the foreground for type T
+go_min_type_reads:    2       # minimum pooled reads of type T for a TSS to join set T
+go_min_total:         2       # mean_total floor for retaining a TSS (as seqarchr_min_total)
+go_upstream_window:   500     # max bp upstream of a gene's 5' end for assignment
+go_downstream_window: 100     # max bp into a gene from its 5' end for assignment
+go_pvalue_cutoff:     0.05    # enrichGO p-value cutoff
+go_qvalue_cutoff:     0.2     # enrichGO q-value cutoff
+go_simplify_cutoff:   0.7     # semantic-similarity cutoff for clusterProfiler::simplify
+go_min_set_size:      10      # foreground sets smaller than this are skipped, not tested
+go_orgdb_yeast:       "org.Sc.sgd.db"   # annotation package for sacCer3
+go_keytype:           "ORF"             # key type used against that package
+
+# ── Stage 17: single-type-dominated TSSs ─────────────────────────────────────
+# Read classification here is keyed by the literal 5' soft-clip sequence rather
+# than by the coarse 1Sg/2Sgg/3Sggg/M/other vocabulary of Stage 8, because the
+# collapsed "other" class is 6.6 % of reads and contains specific, common clips
+# (2Sga alone outnumbers 2Sgg genome-wide).
+results_dominance:        "results/dominance"
+dom_min_depth:            25      # minimum pooled reads for a cluster to be considered
+dom_thresholds:           [0.7, 0.8]   # dominance fractions, both evaluated
+dom_min_samples:          4       # samples in which the type must also dominate
+dom_min_reads_per_sample: 5       # reads needed for a sample to count toward the above
+dom_fdr:                  0.05    # Benjamini-Hochberg threshold for the binomial test
+dom_max_clip:             4       # clips longer than this collapse to "longclip"
+dom_min_class_size:       10      # dominance classes smaller than this are described, not tested
+dom_min_total:            5       # per-position pooled floor; MUST equal Stage 8's --min_total
+dom_max_dist:             20      # clustering distance; MUST equal Stage 8's --max_dist
+
+# ── Stage 18: A−8 saturation of <5' end type, dinucleotide> pairs ─────────────
+# The background window is frozen at -20..-11 because the pooled per-position A
+# profile is flat there (32.3-33.5 %) while -9 and -7 are shoulders of the -8
+# peak (35.8 % and 35.6 %) and -2..-7 are all mildly elevated. Position -1 is
+# excluded from every background set because it IS the first base of the
+# initiator dinucleotide and is therefore fixed within a pair.
+results_a8:              "results/a8"
+a8_upstream:             20      # window spans -a8_upstream .. +1
+a8_obs_coord:            -8      # the position under test
+a8_bg_plateau:           [-20, -19, -18, -17, -16, -15, -14, -13, -12, -11]
+a8_bg_proximal:          [-2, -3, -4, -5, -6, -7, -9]   # sensitivity background
+a8_min_type_reads:       2       # reads of a type needed for a position to join its pair
+a8_min_positions:        200     # distinct qualifying CTSS needed to test a pair
+a8_n_boot:               1000    # cluster bootstrap resamples, primary config only
+a8_seed:                 42
+a8_fdr:                  0.05    # Benjamini-Hochberg threshold
+a8_min_total:            5       # per-position pooled floor; MUST equal Stage 8's --min_total
+a8_max_dist:             20      # clustering distance; MUST equal Stage 8's --max_dist

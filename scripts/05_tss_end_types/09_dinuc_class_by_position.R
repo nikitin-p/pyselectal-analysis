@@ -392,13 +392,13 @@ pB <- ggplot(res, aes(position_lab, class, fill = log2_ratio)) +
 cap <- paste0(
   "Position +1 is the first templated base; there is no zero position. The dinucleotide at ",
   "column q is (prev(q), q), so +1 is the (-1,+1) initiator. All ",
-  length(unique(res$end_type)), " end types use all samples combined, read-weighted.\n",
+  length(unique(res$end_type)), " end types use all samples combined, alignment-weighted.\n",
   "Expected frequencies come from the ", basename(genome_f), " dinucleotide composition on ",
   "both strands. At columns -1 and +1 the expectation is conditioned on the STAR local-",
   "alignment constraint\n(the genomic base at -1 cannot equal the clip base), which is why ",
   "the +1 expectation differs between clip types and M. Asterisk: BH q < 0.05 across all ",
   nrow(res), " cells.\n",
-  "Reads at one position are not independent, so with millions of reads the asterisks ",
+  "Alignments at one position are not independent, so with millions of alignments the asterisks ",
   "certify direction rather than importance; panel B carries the effect size."
 )
 

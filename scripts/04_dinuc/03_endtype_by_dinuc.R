@@ -135,9 +135,9 @@ p1 <- ggplot(agg_long, aes(x = dinucleotide, y = percentage, fill = end_type)) +
   labs(
     title = "End-type distribution by initiator dinucleotide",
     subtitle = paste0("Ordered by total expression (left = highest); YR initiators in red.\n",
-                      "Labels give the total number of reads at each initiator."),
+                      "Labels give the total number of alignments at each initiator."),
     x = "Initiator dinucleotide",
-    y = "Percentage of reads"
+    y = "Percentage of alignments"
   ) +
   theme_minimal() +
   theme(
@@ -178,7 +178,7 @@ pheatmap(
   cluster_rows = TRUE,
   cluster_cols = FALSE,
   scale = "none",
-  main = "Percentage of 1Sg reads by dinucleotide",
+  main = "Percentage of 1Sg alignments by dinucleotide",
   labels_row = rename_samples(rownames(mat_1Sg)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,
@@ -201,7 +201,7 @@ pheatmap(
   cluster_rows = TRUE,
   cluster_cols = FALSE,
   scale = "none",
-  main = "Percentage of 2Sgg reads by dinucleotide",
+  main = "Percentage of 2Sgg alignments by dinucleotide",
   labels_row = rename_samples(rownames(mat_2Sgg)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,
@@ -224,7 +224,7 @@ pheatmap(
   cluster_rows = TRUE,
   cluster_cols = FALSE,
   scale = "none",
-  main = "Percentage of 3Sggg reads by dinucleotide",
+  main = "Percentage of 3Sggg alignments by dinucleotide",
   labels_row = rename_samples(rownames(mat_3Sggg)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,
@@ -247,7 +247,7 @@ pheatmap(
   cluster_rows = TRUE,
   cluster_cols = FALSE,
   scale = "none",
-  main = "Percentage of other soft-clipped reads by dinucleotide",
+  main = "Percentage of other soft-clipped alignments by dinucleotide",
   labels_row = rename_samples(rownames(mat_other)),
   annotation_col = col_annotation,
   annotation_colors = ann_colors,

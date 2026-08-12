@@ -154,8 +154,8 @@ p_box <- ggplot(box_dat, aes(x = initiator, y = pct, fill = end_type)) +
                     name = "End type") +
   labs(
     title = "RT template switching by initiator dinucleotide",
-    subtitle = "% reads per TSS cluster × condition; sorted by median % 1Sg",
-    x = "Initiator (TSS−1 | TSS)", y = "% reads"
+    subtitle = "% alignments per TSS cluster × condition; sorted by median % 1Sg",
+    x = "Initiator (TSS−1 | TSS)", y = "% alignments"
   ) +
   theme_bw(base_size = 11) +
   theme(
@@ -203,7 +203,7 @@ p_stack <- ggplot(stack_dat, aes(x = initiator, y = pct, fill = end_type)) +
   labs(
     title = "Mean 5′-end type composition by initiator",
     subtitle = "Labels give the number of TSS cluster × condition observations averaged",
-    x = "Initiator (TSS−1 | TSS)", y = "Mean % reads"
+    x = "Initiator (TSS−1 | TSS)", y = "Mean % alignments"
   ) +
   theme_bw(base_size = 11) +
   theme(

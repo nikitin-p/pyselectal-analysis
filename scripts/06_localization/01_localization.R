@@ -471,11 +471,11 @@ p_bar <- ggplot(plot_dt[!is.na(category)], aes(x = end_type, y = pct, fill = cat
   geom_col(position = "stack", width = 0.7) +
   geom_text(data = bar_n, aes(x = end_type, y = 101, label = fmt_n(n)),
             inherit.aes = FALSE, vjust = 0, size = 2.6, colour = "grey25") +
-  facet_wrap(~level, labeller = labeller(level = c(reads = "Read counts", positions = "Unique positions"))) +
+  facet_wrap(~level, labeller = labeller(level = c(reads = "Alignment counts", positions = "Unique positions"))) +
   scale_fill_manual(values = cat_colors, name = "Category", drop = FALSE) +
   scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 108)) +
   labs(title = paste0("Genomic localization by 5' end type", if(fast_mode) " (fast mode)" else " (ChIPseeker)"),
-       subtitle = "Labels give the number of unique positions or reads behind each bar",
+       subtitle = "Labels give the number of unique positions or alignments behind each bar",
        x = "End type", y = "Percentage") +
   theme_minimal(base_size = 12) +
   theme(legend.position = "bottom", panel.grid.major.x = element_blank())
@@ -524,7 +524,7 @@ p_sample <- ggplot(sample_dt[!is.na(category)], aes(x = end_type, y = pct, fill 
   scale_fill_manual(values = cat_colors, name = "Category", drop = FALSE) +
   scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 110)) +
   labs(title = "Localization by sample",
-       subtitle = "Labels give the number of reads per end type",
+       subtitle = "Labels give the number of alignments per end type",
        x = "End type", y = "Percentage") +
   theme_minimal(base_size = 10) +
   theme(legend.position = "bottom", axis.text.x = element_text(angle = 45, hjust = 1))

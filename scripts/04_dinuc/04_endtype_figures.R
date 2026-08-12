@@ -141,9 +141,9 @@ p_mosaic <- ggplot(mosaic) +
   coord_cartesian(ylim = c(-0.12, 1.12), clip = "off") +
   labs(
     title = "End-type composition by initiator dinucleotide",
-    subtitle = paste0("Column width is proportional to read abundance; each column sums to 100%. ",
-                      "YR initiators in red.\nColumn labels: share of all reads and the read count."),
-    y = "Share of reads at that initiator", x = NULL
+    subtitle = paste0("Column width is proportional to alignment abundance; each column sums to 100%. ",
+                      "YR initiators in red.\nColumn labels: share of all alignments and the alignment count."),
+    y = "Share of alignments at that initiator", x = NULL
   ) +
   theme_minimal(base_size = 10) +
   theme(
@@ -177,7 +177,7 @@ p_rare <- ggplot(rare, aes(x = dinucleotide, y = pct, color = end_type)) +
   annotation_logticks(sides = "l", size = 0.3) +
   labs(
     subtitle = "Rare end types on a log scale; one point per sample. Zero values are omitted (log scale).",
-    x = "Initiator dinucleotide, ordered by abundance", y = "% of reads"
+    x = "Initiator dinucleotide, ordered by abundance", y = "% of alignments"
   ) +
   theme_minimal(base_size = 10) +
   theme(
@@ -329,8 +329,8 @@ p_facet <- ggplot(faceted, aes(x = dinucleotide, y = pct, fill = end_type)) +
   labs(
     title = "End-type composition by initiator dinucleotide, per sample",
     subtitle = paste0("Every bar sums to 100%. Dinucleotides ordered by abundance; YR initiators in red.\n",
-                      "Rotated labels give the number of reads at each initiator."),
-    x = "Initiator dinucleotide", y = "Share of reads"
+                      "Rotated labels give the number of alignments at each initiator."),
+    x = "Initiator dinucleotide", y = "Share of alignments"
   ) +
   theme_minimal(base_size = 10) +
   theme(

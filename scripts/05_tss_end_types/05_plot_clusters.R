@@ -186,7 +186,7 @@ p_bar <- ggplot(bar_dat, aes(x = hclust_group, y = pct, fill = end_type)) +
   scale_fill_manual(values = type_colors, name = "End type") +
   scale_y_continuous(limits = c(0, 110), expand = c(0, 0)) +
   labs(title = "End-type composition per TSS cluster",
-       x = "Cluster", y = "Mean % reads") +
+       x = "Cluster", y = "Mean % alignments") +
   theme_bw(base_size = 11) +
   theme(panel.grid.minor = element_blank())
 

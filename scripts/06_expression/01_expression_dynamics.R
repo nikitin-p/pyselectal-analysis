@@ -146,7 +146,7 @@ p_expr <- ggplot(cond_agg[n_total > 0],
     title    = paste0("TSS cluster expression by condition"),
     subtitle = paste0("High-1Sg clusters: mean pct_1Sg >= ", min_pct_1Sg, "%"),
     x        = "Condition",
-    y        = "Mean reads per cluster (log10+1)"
+    y        = "Mean alignments per cluster (log10+1)"
   ) +
   facet_wrap(~ cluster_class) +
   theme_bw(base_size = 11) +
@@ -187,7 +187,7 @@ p_type <- ggplot(high_cond, aes(x = condition, y = pct, fill = end_type)) +
     title    = paste0("End-type fractions across conditions (high-1Sg clusters)"),
     subtitle = paste0("Clusters with mean pct_1Sg >= ", min_pct_1Sg, "%"),
     x        = "Condition",
-    y        = "Mean % reads"
+    y        = "Mean % alignments"
   ) +
   theme_bw(base_size = 11) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))

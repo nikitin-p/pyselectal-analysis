@@ -125,6 +125,14 @@ $RSCRIPT "$ROOT_DIR/scripts/04_dinuc/02_yr_enrichment.R" \
 log_info "Stages 8+9: TSS end-type matrix and clustering"
 bash "$ROOT_DIR/scripts/05_tss_end_types/run.sh" $FORCE_FLAG
 
+# ── Stage 17: single-type-dominated TSSs ─────────────────────────────────────
+log_info "Stage 17: single-type-dominated TSSs"
+bash "$ROOT_DIR/scripts/10_dominant_endtype/run.sh" $FORCE_FLAG
+
+# ── Stage 18: A-8 saturation of <5' end type, dinucleotide> pairs ────────────
+log_info "Stage 18: A-8 saturation of <5' end type, dinucleotide> pairs"
+bash "$ROOT_DIR/scripts/11_a8_saturation/run.sh" $FORCE_FLAG
+
 # ── Stage 14: HTML analysis report ───────────────────────────────────────────
 log_info "Stage 14: HTML analysis report"
 bash "$ROOT_DIR/scripts/07_report/run.sh" $FORCE_FLAG

@@ -433,8 +433,8 @@ p3 <- ggplot(init_plot, aes(x = initiator, y = extra_G_rate, fill = is_YR)) +
   theme_minimal(base_size = 10) +
   labs(x = "Initiator dinucleotide (-1, +1)", y = "extra-G rate",
        title = "Extra-G rate by initiator dinucleotide",
-       subtitle = paste("Dashed line = global rate; initiators with >= 1000 ladder reads.",
-                        "Labels give the ladder reads per initiator.")) +
+       subtitle = paste("Dashed line = global rate; initiators with >= 1000 ladder alignments.",
+                        "Labels give the ladder alignments per initiator.")) +
   theme(legend.position = "bottom")
 ggsave(file.path(figdir, "13_gladder_by_initiator.pdf"), p3, width = 8, height = 4.5)
 
