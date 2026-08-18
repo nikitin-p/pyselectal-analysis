@@ -103,10 +103,10 @@ Key STAR flags:
 
 ### Stage 2 — Subsampling to equal depth
 
-**Script:** `scripts/02_subsample/01_subsample.sh`  
+**Scripts:** `scripts/02_subsample/01_subsample.sh`, `scripts/02_subsample/02_plot_depth.R`  
 **Status:** The analysis is complete for the yeast dataset.  
 **Input:** `results/bam/*_uniq.bam`  
-**Output:** The subsampled BAM files are written to `results/bam_subsampled/{sample}_sub.bam`.
+**Output:** The subsampled BAM files are written to `results/bam_subsampled/{sample}_sub.bam`, the depth table and the summary statistics to `results/qc/library_depth.tsv` and `results/qc/depth_stats.tsv`, and the depth plot to `results/figures/02_library_depth.pdf`.
 
 The script performs the following steps:
 
@@ -114,9 +114,28 @@ The script performs the following steps:
 2. The Q1, Q3, and IQR are computed across all libraries;
 3. Any library with depth below the Tukey lower fence (Q1 − 1.5×IQR) is **excluded** — excluded libraries are logged and dropped from all downstream analysis;
 4. The subsampling target is set as `floor(subsample_factor × min(retained depths))` (default factor 0.95);
-5. Each retained library is subsampled with `samtools view -s SEED.FRAC` (seed 42).
+5. Each retained library is subsampled with `samtools view -s SEED.FRAC` (seed 42);
+6. The depths, the exclusion decisions, and the threshold statistics are written to `results/qc/`, and `02_plot_depth.R` renders them as a figure.
 
-For the yeast dataset, all 8 libraries were retained and the target was 2,190,922 reads.
+The depth figure has two panels. The upper panel is one bar per library, sorted from
+the shallowest to the deepest, coloured by whether the library was retained, with the
+Tukey lower fence and the subsampling target drawn as vertical dashed lines. The lower
+panel shows the same depths as a boxplot on the same axis, which is what makes the fence
+legible as a property of the distribution rather than as an arbitrary number. The counting
+loop is unconditional, so both tables and the figure are refreshed even on a run in which
+every subsampled BAM already exists. A failure of the plotting step is reported as a
+warning and does not fail the stage, because the figure reports the exclusion decision
+rather than informing it.
+
+For the yeast dataset, all 8 libraries were retained and the target was 1,736,369 reads,
+which is 0.95 × 1,827,757, the depth of the shallowest library. The retention was not a
+statement that the libraries are of comparable depth: they range from 1.8 M to 12.6 M
+uniquely mapped reads, and that spread makes the IQR wide enough to push the Tukey lower
+fence below zero, where it is clamped, so the rule could not have excluded anything.
+The tables in `results/qc/` were reconstructed from the STAR summary archived in
+`results/multiqc_report.html`, because `results/bam/` no longer holds the `_uniq.bam`
+files; `results/qc/PROVENANCE.txt` records the reconstruction and the check against the
+subsampled BAM files.
 
 ---
 
@@ -239,7 +258,7 @@ Start sites are first restricted to those carrying a YR initiator and lying insi
 annotated promoter window, so the comparison is made within a homogeneous pool. Only
 then are the sites ranked by end-class purity and the top decile of each class retained,
 which gives three matched sets (`1Sg`-dominated, `M`-dominated, and other-soft-clip
-dominated). The genomic sequence from 50 bp upstream to 10 bp downstream is extracted
+dominated). The genomic sequence from 15 bp upstream to 15 bp downstream is extracted
 strand-aware, and the three sets are compared as sequence logos, as per-position
 nucleotide frequencies, and as pairwise frequency differences.
 
@@ -301,9 +320,9 @@ excluded from both the observation and the background so that the comparison sta
 internally consistent.
 
 The companion script `10_motif_by_dinuc_class.R` rebuilds the sequence logos of Stage 9a
-separately within each initiator dinucleotide class, using an asymmetric −35 to +20
-window, because the yeast core promoter extends further upstream of the start site than
-downstream of it. `3Sggg` is excluded from the default type list, since its reads do not
+separately within each initiator dinucleotide class, using a symmetric −15 to +15
+window, because the signal this stage is about is the initiator dinucleotide and the
+bases immediately flanking it rather than the wider core promoter. `3Sggg` is excluded from the default type list, since its reads do not
 survive a four-way split into readable logos.
 
 ---
@@ -559,6 +578,7 @@ data/                   raw FASTQ (per-dataset subdirs or symlinks)
 results/
   bam/                  STAR output, MAPQ-filtered
   bam_subsampled/       depth-equalised BAMs (*_sub.bam)
+  qc/                   library_depth.tsv and depth_stats.tsv (Stage 2)
   bam_selected/         type-filtered BAMs (*_1Sg.bam, *_2Sgg.bam, *_3Sggg.bam)
   five_prime/           pyselectal count TSVs per sample
   dinuc/                dinucleotide proportions (all reads)

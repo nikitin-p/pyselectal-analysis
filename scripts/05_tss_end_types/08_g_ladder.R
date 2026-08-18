@@ -49,6 +49,13 @@ suppressPackageStartupMessages({
   library(yaml)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -163,9 +170,10 @@ message("  rows: ", nrow(ctss), "   samples: ", uniqueN(ctss$sample_id))
 
 ladder_cols <- c("n_1Sg", "n_2Sgg", "n_3Sggg")
 stopifnot(all(ladder_cols %in% names(ctss)))
+stopifnot("n_2Stg" %in% names(ctss))
 
 agg <- ctss[, c(lapply(.SD, sum)),
-            .SDcols = c(ladder_cols, "n_M", "n_total"),
+            .SDcols = c(ladder_cols, "n_2Stg", "n_M", "n_total"),
             by = .(chr, pos, strand)]
 agg[, depth := n_1Sg + n_2Sgg + n_3Sggg]
 message("  positions with any ladder read: ", format(sum(agg$depth > 0), big.mark = ","))
@@ -196,6 +204,9 @@ ladder_of <- function(d, label) {
   data.frame(
     set        = label,
     n_G        = 1:3,
+    # The ladder proper is the pure G run. 2Stg abuts the genome with a G but
+    # carries a 5' T, so it is drawn alongside the ladder rather than inside it:
+    # folding it in would inflate the second rung with a different species.
     type       = c("1Sg", "2Sgg", "3Sggg"),
     reads      = as.integer(tot),
     proportion = round(p, 6),
@@ -204,6 +215,21 @@ ladder_of <- function(d, label) {
 }
 global_tab <- rbind(ladder_of(lad, "all"), ladder_of(clean, "outliers removed"))
 write_tsv(global_tab, out_main)
+
+# 2Stg reference rate, reported alongside the ladder but never mixed into it:
+# it is a separate row rather than a fourth "n_G" rung (see the note in
+# ladder_of() above). Expressed as a share of the same ladder depth so it is
+# directly comparable to the ladder's own proportions.
+stg_of <- function(d, label) {
+  data.frame(
+    set        = label,
+    type       = "2Stg",
+    reads      = as.integer(sum(d$n_2Stg)),
+    proportion = round(sum(d$n_2Stg) / sum(d$depth), 6)
+  )
+}
+stg_tab <- rbind(stg_of(lad, "all"), stg_of(clean, "outliers removed"))
+write_tsv(stg_tab, file.path(outdir, "ladder_2Stg_reference.tsv"))
 
 geo_of <- function(d) {
   q1 <- sum(d$n_2Sgg) / sum(d$n_1Sg)
@@ -459,7 +485,33 @@ p4 <- ggplot(ps_long, aes(x = sample_id, y = ratio, fill = step)) +
        subtitle = paste("Equal bars within a sample support a geometric (constant-probability) process.",
                         "Labels give the ladder depth per sample.")) +
   theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "bottom")
-ggsave(file.path(figdir, "13_gladder_by_sample.pdf"), p4, width = 10, height = 4.5)
+# 13e: the global ladder itself (1Sg -> 2Sgg -> 3Sggg), with the 2Stg reference
+# rate drawn as its own dashed series rather than folded into the ladder line.
+ladder_plot_df <- subset(global_tab, set == "outliers removed")
+ladder_plot_df$type <- factor(ladder_plot_df$type, levels = c("1Sg", "2Sgg", "3Sggg"))
+stg_rate <- stg_tab$proportion[stg_tab$set == "outliers removed"]
+
+p5 <- ggplot(ladder_plot_df, aes(x = n_G, y = proportion)) +
+  geom_line(aes(colour = "ladder (1Sg / 2Sgg / 3Sggg)"), linewidth = 0.8) +
+  geom_point(aes(colour = type), size = 2.5) +
+  geom_hline(aes(yintercept = stg_rate, colour = "2Stg (not part of the ladder)"),
+             linetype = "dashed", linewidth = 0.7) +
+  scale_colour_manual(
+    name   = NULL,
+    values = c(
+      setNames(unname(END_TYPE_COLORS_TAB10[levels(ladder_plot_df$type)]),
+                levels(ladder_plot_df$type)),
+      "ladder (1Sg / 2Sgg / 3Sggg)"    = "grey40",
+      "2Stg (not part of the ladder)"  = unname(END_TYPE_COLORS_TAB10["2Stg"])
+    )
+  ) +
+  scale_x_continuous(breaks = 1:3, labels = levels(ladder_plot_df$type)) +
+  theme_minimal(base_size = 10) +
+  labs(x = NULL, y = "Proportion of ladder depth",
+       title = "Added-G ladder vs the 2Stg reference rate",
+       subtitle = "2Stg abuts the genome with G but carries a 5' T, so it is not a fourth rung") +
+  theme(legend.position = "bottom")
+ggsave(file.path(figdir, "13_gladder_global.pdf"), p5, width = 7, height = 5)
 
 # ── per-position table ────────────────────────────────────────────────────────
 keep_cols <- c("chr", "pos", "strand", "n_1Sg", "n_2Sgg", "n_3Sggg", "n_M", "depth",

@@ -16,7 +16,26 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-[[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
+
+# Genome and annotation come from the params file, so that switching datasets is
+# a change of params file rather than a change of script. Relative paths are
+# resolved against the project root; absolute paths are used as given.
+resolve_path() {
+    local v="$1"
+    [[ -z "$v" ]] && { printf ''; return; }
+    [[ "$v" != /* ]] && v="$ROOT_DIR/$v"
+    printf '%s' "$v"
+}
+ANNOTATION_GTF="$(resolve_path "$(yaml_get annotation_gtf "$PARAMS")")"
 
 CONDA_ENV="$(yaml_get conda_env_r "$PARAMS")"
 RSCRIPT=$(conda run -n "$CONDA_ENV" which Rscript)
@@ -26,12 +45,12 @@ log_info "Stage 06: Genomic localization by end type"
 $RSCRIPT "$SCRIPT_DIR/01_localization.R" \
     --samples    "$SAMPLES" \
     --params     "$PARAMS" \
-    --bam_sel    "$ROOT_DIR/results/bam_selected" \
-    --bam_sub    "$ROOT_DIR/results/bam_subsampled" \
-    --tss        "$ROOT_DIR/results/tss/tss_clustered.tsv" \
-    --gtf        "$ROOT_DIR/data/sacCer3.ensGene.gtf" \
-    --outdir     "$ROOT_DIR/results/localization" \
-    --figdir     "$ROOT_DIR/results/figures" \
+    --bam_sel    "$RESULTS_ROOT/bam_selected" \
+    --bam_sub    "$RESULTS_ROOT/bam_subsampled" \
+    --tss        "$RESULTS_ROOT/tss/tss_clustered.tsv" \
+    --gtf        "$ANNOTATION_GTF" \
+    --outdir     "$RESULTS_ROOT/localization" \
+    --figdir     "$RESULTS_ROOT/figures" \
     $FORCE_FLAG
 
 log_info "Stage 06 complete."

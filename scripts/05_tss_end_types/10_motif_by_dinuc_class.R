@@ -66,8 +66,8 @@
 #       [--outdir     results/motifs]                 \
 #       [--figdir     results/figures]                \
 #       [--types      1Sg,M,2Sgg,1Sa,1Sc,1St]         \
-#       [--upstream   20]                             \
-#       [--downstream 20]                             \
+#       [--upstream   15]                             \
+#       [--downstream 15]                             \
 #       [--min_reads  200]                            \
 #       [--min_ess    100]                            \
 #       [--force]
@@ -80,6 +80,13 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(readr)
 })
+
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
@@ -122,8 +129,8 @@ genome_f   <- get_arg("--genome",     NULL)
 outdir     <- get_arg("--outdir",     "results/motifs")
 figdir     <- get_arg("--figdir",     "results/figures")
 types_arg  <- get_arg("--types",      "1Sg,M,2Sgg,1Sa,1Sc,1St")
-upstream   <- as.integer(get_arg("--upstream",   "20"))
-downstream <- as.integer(get_arg("--downstream", "20"))
+upstream   <- as.integer(get_arg("--upstream",   "15"))
+downstream <- as.integer(get_arg("--downstream", "15"))
 min_reads  <- as.integer(get_arg("--min_reads",  "200"))
 min_ess    <- as.numeric(get_arg("--min_ess",    "100"))
 force      <- has_flag("--force")
@@ -164,8 +171,8 @@ PANELS     <- c("all", CLASSES)
 WEIGHTINGS <- c("reads", "positions")
 
 # The clip base each type implies at -1 under local alignment; M is unconstrained.
-CLIP_BASE <- c("1Sg" = "G", "2Sgg" = "G", "3Sggg" = "G",
-               "1Sa" = "A", "1Sc" = "C", "1St" = "T", "M" = NA_character_)
+# END_TYPE_CLIP_BASE is defined once in scripts/utils/end_types.R over the full
+# END_TYPES_REAL vocabulary (see the note there on why it's the label's LAST character).
 
 # ── genome resolution and loading ─────────────────────────────────────────────
 if (is.null(genome_f)) {

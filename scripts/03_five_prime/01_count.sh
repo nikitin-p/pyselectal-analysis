@@ -25,6 +25,7 @@ FORCE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --samples) SAMPLES="$2"; shift 2 ;;
+        --params)  PARAMS="$2";  shift 2 ;;
         --outdir)  OUTDIR="$2";  shift 2 ;;
         --force)   FORCE=1;      shift   ;;
         *) die "Unknown argument: $1" ;;
@@ -36,6 +37,7 @@ CONDA_ENV="$(yaml_get conda_env_pyselectal "$PARAMS")"
 COLLAPSE="$(yaml_get collapse_threshold "$PARAMS")"
 MAPPED_PFX="$(yaml_get mapped_prefix "$PARAMS")"
 [[ -z "$OUTDIR" ]] && OUTDIR="$(yaml_get results_five_prime "$PARAMS")"
+[[ "$OUTDIR" != /* ]] && OUTDIR="$ROOT_DIR/$OUTDIR"
 
 # Resolve pyselectal path relative to project root
 [[ "$PYSELECTAL" != /* ]] && PYSELECTAL="$ROOT_DIR/$PYSELECTAL"

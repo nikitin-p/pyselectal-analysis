@@ -2,17 +2,19 @@
 # Stage 1: map FASTQ files with STAR and filter for uniquely mapped reads (MAPQ = 255).
 #
 # Usage:
-#   bash scripts/01_map/01_map.sh [--samples FILE] [--outdir DIR] [--force]
+#   bash scripts/01_map/01_map.sh [--samples FILE] [--params FILE] [--outdir DIR] [--force]
 #
 # Defaults:
 #   --samples  config/samples.tsv
-#   --outdir   results/bam   (from params.yaml results_bam)
+#   --params   config/params.yaml
+#   --outdir   results/bam   (from the params file's results_bam)
 #
 # Reads from samples.tsv: sample_id, dataset, fastq.
 # Skips rows with an empty fastq column or no fastq path.
 # STAR index is selected by dataset:
-#   yeast_cage              -> star_index_saccer3
-#   luhmes_cage / luhmes_netcage / netcage_* -> star_index_hg38
+#   yeast_cage                               -> star_index_saccer3
+#   luhmes_cage / luhmes_netcage / netcage_* -> star_index_human, falling back to
+#                                               star_index_hg38 when it is empty
 #
 # Outputs: {outdir}/{sample_id}_uniq.bam  (sorted, indexed, MAPQ-filtered)
 # Skips samples whose output already exists unless --force is given.
@@ -31,6 +33,7 @@ FORCE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --samples) SAMPLES="$2"; shift 2 ;;
+        --params)  PARAMS="$2";  shift 2 ;;
         --outdir)  OUTDIR="$2";  shift 2 ;;
         --force)   FORCE=1;      shift   ;;
         *) die "Unknown argument: $1" ;;
@@ -43,6 +46,17 @@ MAPQ="$(yaml_get mapq_threshold "$PARAMS")"
 STAR_EXTRA_RAW="$(yaml_get star_extra_args "$PARAMS")"
 STAR_IDX_SACCER3="$(yaml_get star_index_saccer3 "$PARAMS")"
 STAR_IDX_HG38="$(yaml_get star_index_hg38 "$PARAMS")"
+# star_index_human is the T2T-CHM13v2.0 index used by the LUHMES datasets; the
+# older star_index_hg38 key is kept as a fallback so that existing params files
+# without star_index_human keep working.
+STAR_IDX_HUMAN="$(yaml_get star_index_human "$PARAMS" || true)"
+[[ -z "$STAR_IDX_HUMAN" ]] && STAR_IDX_HUMAN="$STAR_IDX_HG38"
+# Sorting RAM is a per-genome, per-node quantity: the 3 GB that suffices for
+# sacCer3 is far too little for a human genome, where STAR spills to thousands
+# of temporary files and then fails to merge them. It is therefore configurable,
+# and the old yeast value is the fallback for params files that predate the key.
+STAR_SORT_RAM="$(yaml_get star_limit_bam_sort_ram "$PARAMS" || true)"
+[[ -z "$STAR_SORT_RAM" ]] && STAR_SORT_RAM=3000000000
 CONDA_STAR="$(yaml_get conda_env_star "$PARAMS")"
 CONDA_TOOLS="$(yaml_get conda_env_tools "$PARAMS")"
 [[ -z "$OUTDIR" ]] && OUTDIR="$ROOT_DIR/$(yaml_get results_bam "$PARAMS")"
@@ -92,8 +106,8 @@ while IFS=$'\t' read -ra row; do
             [[ -z "$STAR_IDX" ]] && die "[$sid] star_index_saccer3 not set in params.yaml"
             ;;
         luhmes_cage|luhmes_netcage|netcage_*)
-            STAR_IDX="$STAR_IDX_HG38"
-            [[ -z "$STAR_IDX" ]] && die "[$sid] star_index_hg38 not set in params.yaml"
+            STAR_IDX="$STAR_IDX_HUMAN"
+            [[ -z "$STAR_IDX" ]] && die "[$sid] neither star_index_human nor star_index_hg38 is set in $PARAMS"
             ;;
         *)
             die "[$sid] Unknown dataset '$dataset' — add a case to select a STAR index"
@@ -129,7 +143,7 @@ while IFS=$'\t' read -ra row; do
         --outSAMtype BAM SortedByCoordinate \
         --outSAMmultNmax 1 \
         --outFilterMultimapNmax 1 \
-        --limitBAMsortRAM 3000000000 \
+        --limitBAMsortRAM "$STAR_SORT_RAM" \
         --outFileNamePrefix "$TMP_DIR/" \
         "${STAR_EXTRA[@]}" \
         > "$LOG" 2>&1

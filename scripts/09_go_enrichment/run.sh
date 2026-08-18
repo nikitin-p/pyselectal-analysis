@@ -17,12 +17,26 @@ source "$ROOT_DIR/scripts/utils/log.sh"
 source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 
 PARAMS="$ROOT_DIR/config/params.yaml"
+SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-[[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
 
 OUTDIR="$ROOT_DIR/$(yaml_get results_go "$PARAMS")"
 FIGDIR="$ROOT_DIR/$(yaml_get results_figures "$PARAMS")"
-GENES_BED="$ROOT_DIR/$(yaml_get annotation_bed_yeast "$PARAMS")"
+# The generic annotation_bed / go_orgdb keys are read first; the older
+# *_yeast keys remain as a fallback for params files that predate them.
+GENES_BED="$(yaml_get annotation_bed "$PARAMS")"
+[[ -z "$GENES_BED" ]] && GENES_BED="$(yaml_get annotation_bed_yeast "$PARAMS")"
+[[ -z "$GENES_BED" ]] && die "No gene BED configured: set annotation_bed in $PARAMS"
+[[ "$GENES_BED" != /* ]] && GENES_BED="$ROOT_DIR/$GENES_BED"
 
 QUANTILE="$(yaml_get go_quantile          "$PARAMS")"
 MIN_TYPE="$(yaml_get go_min_type_reads    "$PARAMS")"
@@ -33,7 +47,8 @@ PVAL="$(yaml_get go_pvalue_cutoff         "$PARAMS")"
 QVAL="$(yaml_get go_qvalue_cutoff         "$PARAMS")"
 SIMPLIFY="$(yaml_get go_simplify_cutoff   "$PARAMS")"
 MIN_SET="$(yaml_get go_min_set_size       "$PARAMS")"
-ORGDB="$(yaml_get go_orgdb_yeast          "$PARAMS")"
+ORGDB="$(yaml_get go_orgdb "$PARAMS")"
+[[ -z "$ORGDB" ]] && ORGDB="$(yaml_get go_orgdb_yeast "$PARAMS")"
 KEYTYPE="$(yaml_get go_keytype            "$PARAMS")"
 
 # clusterProfiler is installed in the system R library, not in conda_env_r.
@@ -49,8 +64,8 @@ $RSCRIPT "$SCRIPT_DIR/00_install.R"
 
 log_info "Stage 16 step 1: assigning TSS clusters to genes"
 $RSCRIPT "$SCRIPT_DIR/01_assign_genes.R" \
-    --tss_matrix    "$ROOT_DIR/results/tss/tss_matrix.tsv"    \
-    --tss_clustered "$ROOT_DIR/results/tss/tss_clustered.tsv" \
+    --tss_matrix    "$RESULTS_ROOT/tss/tss_matrix.tsv"    \
+    --tss_clustered "$RESULTS_ROOT/tss/tss_clustered.tsv" \
     --genes_bed     "$GENES_BED"    \
     --outdir        "$OUTDIR"       \
     --upstream      "$UPSTREAM"     \

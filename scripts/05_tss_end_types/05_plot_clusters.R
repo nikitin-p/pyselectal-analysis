@@ -26,6 +26,17 @@ suppressPackageStartupMessages({
   library(readr)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by test/test_build_ctss_types.R) rather
+# than run directly, commandArgs(FALSE) reflects the OUTER script's --file,
+# not this file's own path, so the path above can resolve to the wrong
+# directory depth. Fall back to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -60,8 +71,8 @@ dt  <- fread(clustered_f)
 hc  <- readRDS(hclust_rds)
 
 k_clusters  <- uniqueN(dt$hclust_group)
-type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7",
-                 "M"   = "#06d6a0", "other" = "#adb5bd")
+type_colors <- END_TYPE_COLORS_BRIGHT
+mean_cols   <- end_type_cols("mean_pct_", END_TYPES)
 
 # Cluster group colors
 group_levels <- paste0("C", sort(as.integer(sub("C", "", unique(dt$hclust_group)))))
@@ -113,12 +124,10 @@ dt_ord$hclust_group <- factor(dt_ord$hclust_group, levels = group_levels)
 
 heat_long <- dt_ord |>
   as.data.frame() |>
-  select(row_rank, hclust_group,
-         `1Sg` = mean_pct_1Sg, `2Sgg` = mean_pct_2Sgg, `3Sggg` = mean_pct_3Sggg,
-         M = mean_pct_M, other = mean_pct_other) |>
-  pivot_longer(cols = c(`1Sg`, `2Sgg`, `3Sggg`, M, other),
-               names_to = "end_type", values_to = "pct") |>
-  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")))
+  select(row_rank, hclust_group, all_of(mean_cols)) |>
+  rename_with(~ END_TYPES, all_of(mean_cols)) |>
+  pivot_longer(cols = all_of(END_TYPES), names_to = "end_type", values_to = "pct") |>
+  mutate(end_type = factor(end_type, levels = END_TYPES))
 
 n_tss <- nrow(dt_ord)
 
@@ -162,18 +171,14 @@ bar_dat <- dt |>
   as.data.frame() |>
   group_by(hclust_group) |>
   summarise(
-    `1Sg`  = mean(mean_pct_1Sg,   na.rm = TRUE),
-    `2Sgg`  = mean(mean_pct_2Sgg,   na.rm = TRUE),
-    `3Sggg` = mean(mean_pct_3Sggg, na.rm = TRUE),
-    M      = mean(mean_pct_M,     na.rm = TRUE),
-    other  = mean(mean_pct_other, na.rm = TRUE),
-    n      = n(),
+    across(all_of(mean_cols), ~ mean(.x, na.rm = TRUE)),
+    n = n(),
     .groups = "drop"
   ) |>
-  pivot_longer(cols = c(`1Sg`, `2Sgg`, `3Sggg`, M, other),
-               names_to = "end_type", values_to = "pct") |>
+  rename_with(~ END_TYPES, all_of(mean_cols)) |>
+  pivot_longer(cols = all_of(END_TYPES), names_to = "end_type", values_to = "pct") |>
   mutate(
-    end_type    = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")),
+    end_type    = factor(end_type, levels = END_TYPES),
     hclust_group = factor(hclust_group, levels = group_levels),
     label       = paste0(hclust_group, "\n(n=", n, ")")
   )

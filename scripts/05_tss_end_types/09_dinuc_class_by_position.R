@@ -29,8 +29,9 @@
 #
 # Note on p-values: reads at one genomic position are not independent, so with millions of
 # 1Sg reads nearly every cell clears q < 0.05 regardless of effect size. The asterisks certify
-# direction, not importance — panel B carries the effect size. The same test computed on
-# distinct positions instead of reads is written to the TSV as a sensitivity column.
+# direction, not importance — the fill carries the effect size. The same test computed on
+# distinct positions instead of reads is written to the TSV as a sensitivity column, and it
+# stars 83 of the 224 cells rather than 169.
 #
 # Usage:
 #   Rscript scripts/05_tss_end_types/09_dinuc_class_by_position.R \
@@ -53,6 +54,13 @@ suppressPackageStartupMessages({
   library(readr)
   library(yaml)
 })
+
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
@@ -121,8 +129,8 @@ OTHER_GY <- "#6c757d"
 
 # 'other' is excluded on purpose: it mixes clip lengths and clip first bases, so it has no
 # single well-defined constraint at -1 and therefore no valid conditional expectation.
-CLIP_BASE <- c("1Sg" = "G", "2Sgg" = "G", "3Sggg" = "G",
-               "1Sa" = "A", "1Sc" = "C", "1St" = "T", "M" = NA_character_)
+# END_TYPE_CLIP_BASE (scripts/utils/end_types.R) is keyed over END_TYPES_REAL, which
+# includes "other"'s siblings but not "other" itself, so no further filtering is needed here.
 CLASSES   <- c("YR", "YY", "RR", "RY")
 
 # ── genome resolution and loading ─────────────────────────────────────────────
@@ -186,7 +194,7 @@ exp_props <- function(keep) {
 
 # The restriction that applies to end type `type` at output position `q`.
 bg_mask <- function(type, q) {
-  b <- CLIP_BASE[[type]]
+  b <- END_TYPE_CLIP_BASE[[type]]
   if (is.na(b))    return(rep(TRUE, length(DINUCS)))   # M: unconstrained everywhere
   if (q ==  1L)    return(di_b1 != b)                  # dinuc (-1,+1): -1 is the first base
   if (q == -1L)    return(di_b2 != b)                  # dinuc (-2,-1): -1 is the second base
@@ -198,7 +206,7 @@ message("Loading typed CTSS: ", ctss_f)
 ctss <- fread(cmd = paste("gzip -cd", shQuote(ctss_f)))
 message("  rows: ", nrow(ctss))
 
-tcols <- paste0("n_", names(CLIP_BASE))
+tcols <- paste0("n_", names(END_TYPE_CLIP_BASE))
 missing_cols <- setdiff(tcols, colnames(ctss))
 if (length(missing_cols) > 0) {
   stop("Missing end-type columns in ", ctss_f, ": ", paste(missing_cols, collapse = ", "))
@@ -335,7 +343,7 @@ message("Written: ", out_main)
 
 bg <- data.table(dinucleotide = DINUCS, class = di_cls, genome_count = as.numeric(dn))
 bg[, genome_freq := genome_count / sum(genome_count)]
-for (b in setdiff(unique(CLIP_BASE), NA)) {
+for (b in setdiff(unique(END_TYPE_CLIP_BASE), NA)) {
   bg[[paste0("used_at_plus1_clip", b)]]  <- di_b1 != b
   bg[[paste0("used_at_minus1_clip", b)]] <- di_b2 != b
 }
@@ -350,26 +358,23 @@ res[, class := factor(as.character(class), levels = c("RY", "RR", "YY", "YR"))]
 
 ylab_cols <- ifelse(levels(res$class) == "YR", YR_RED, OTHER_GY)
 
+# The initiator column is the point of the figure, so it is marked twice: its axis label is
+# drawn in the canonical-initiator colour and a box is stroked around the column itself.
+x_levels  <- levels(res$position_lab)
+plus1_i   <- which(x_levels == "+1")
+xlab_cols <- ifelse(x_levels == "+1", YR_RED, OTHER_GY)
+xlab_face <- ifelse(x_levels == "+1", "bold", "plain")
+
 base_theme <- theme_minimal(base_size = 9) +
   theme(
     panel.grid    = element_blank(),
     axis.text.y   = element_text(colour = ylab_cols, face = "bold"),
-    axis.text.x   = element_text(size = 7),
+    axis.text.x   = element_text(size = 7, colour = xlab_cols, face = xlab_face),
     axis.title    = element_blank(),
     strip.text    = element_text(face = "bold", size = 9),
     legend.position = "right",
     legend.key.height = unit(1.2, "cm")
   )
-
-cell_label <- function(pct, sig) paste0(sprintf("%.1f", pct), ifelse(sig, "*", ""))
-
-pA <- ggplot(res, aes(position_lab, class, fill = obs_pct)) +
-  geom_tile(colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = cell_label(obs_pct, sig)), size = 1.9) +
-  facet_grid(. ~ end_type) +
-  scale_fill_gradient(low = "#f7f7f7", high = "#2166ac", name = "observed %") +
-  labs(title = "A. Observed composition (each position column sums to 100 %)") +
-  base_theme
 
 # The scale is capped rather than stretched to the data range. A near-absent class produces
 # log2 values around -9 (e.g. 1Sg at +1, RY), and letting those set the limits washes every
@@ -378,37 +383,48 @@ obs_max <- max(abs(res$log2_ratio[is.finite(res$log2_ratio)]), na.rm = TRUE)
 lim     <- min(log2_cap, obs_max)
 message("  log2 range in data: +/-", round(obs_max, 2), "; colour scale capped at +/-", lim)
 
-pB <- ggplot(res, aes(position_lab, class, fill = log2_ratio)) +
+n_cls <- nlevels(res$class)
+
+fig <- ggplot(res, aes(position_lab, class, fill = log2_ratio)) +
   geom_tile(colour = "white", linewidth = 0.4) +
-  geom_text(aes(label = cell_label(obs_pct, sig)), size = 1.9) +
+  geom_text(aes(label = ifelse(sig, "*", "")), size = 3.6, vjust = 0.75) +
+  annotate("rect", xmin = plus1_i - 0.5, xmax = plus1_i + 0.5,
+           ymin = 0.5, ymax = n_cls + 0.5,
+           fill = NA, colour = YR_RED, linewidth = 0.7) +
   facet_grid(. ~ end_type) +
   scale_fill_gradient2(low = "#2166ac", mid = "white", high = "#b2182b",
                        midpoint = 0, limits = c(-lim, lim),
                        oob = scales::squish,
                        name = paste0("log2(obs/exp)\ncapped at +/-", lim)) +
-  labs(title = "B. Enrichment over the conditional genome expectation") +
+  coord_fixed(ratio = 1, expand = FALSE) +
+  labs(title = "Enrichment over the conditional genome expectation") +
   base_theme
 
 cap <- paste0(
   "Position +1 is the first templated base; there is no zero position. The dinucleotide at ",
-  "column q is (prev(q), q), so +1 is the (-1,+1) initiator. All ",
-  length(unique(res$end_type)), " end types use all samples combined, alignment-weighted.\n",
+  "column q is (prev(q), q), so the boxed +1 column is the (-1,+1) initiator. All ",
+  length(unique(res$end_type)), " end types use all samples combined,\nalignment-weighted. ",
   "Expected frequencies come from the ", basename(genome_f), " dinucleotide composition on ",
   "both strands. At columns -1 and +1 the expectation is conditioned on the STAR local-",
   "alignment constraint\n(the genomic base at -1 cannot equal the clip base), which is why ",
   "the +1 expectation differs between clip types and M. Asterisk: BH q < 0.05 across all ",
   nrow(res), " cells.\n",
   "Alignments at one position are not independent, so with millions of alignments the asterisks ",
-  "certify direction rather than importance; panel B carries the effect size."
+  "certify direction rather than importance; the fill carries the effect size. Observed and ",
+  "expected percentages are in ", basename(out_main), "."
 )
 
-fig <- (pA / pB) +
-  plot_annotation(caption = cap,
-                  theme = theme(plot.caption = element_text(hjust = 0, size = 6.5,
-                                                            colour = OTHER_GY)))
+fig <- fig +
+  labs(caption = cap) +
+  theme(plot.caption = element_text(hjust = 0, size = 6.5, colour = OTHER_GY))
 
-fig_w <- 3 + 2.4 * length(TYPES)
-ggsave(out_fig, fig, width = fig_w, height = 7, limitsize = FALSE)
+# coord_fixed() makes the cells square, so the canvas is sized from a target cell edge rather
+# than the other way round: whichever of width or height binds first would otherwise be padded
+# out with whitespace.
+CELL_IN <- 0.30
+fig_w <- 1.9 + CELL_IN * length(TYPES) * length(ends) + 0.12 * length(TYPES)
+fig_h <- 1.6 + CELL_IN * n_cls
+ggsave(out_fig, fig, width = fig_w, height = fig_h, limitsize = FALSE)
 message("Written: ", out_fig)
 
 sessionInfo()

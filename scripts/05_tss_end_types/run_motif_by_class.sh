@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Stage 8 step 10: motifs per 5' end type, split by initiator dinucleotide class.
 #
-# 3Sggg is left out of the default type list because its 16,369 reads do not survive a
-# four-way split into readable logos. Pass a different --types list to override.
+# 3Sggg is left out of the default type list (eight of the nine real end types) because
+# its 16,369 reads do not survive a four-way split into readable logos. Pass a different
+# --types list to override.
 #
-# The window is asymmetric, running from -35 to +20, for the same reason the seqArchR
-# stage uses an asymmetric window: the yeast core promoter extends considerably further
-# upstream of the start site than downstream of it, so a symmetric window spends half its
-# width on transcript body sequence that carries no promoter signal.
+# The window is symmetric, running from -15 to +15, because the signal this stage is
+# about sits immediately around the start site: the initiator dinucleotide, the bases
+# that the reverse transcriptase reads through, and the first few templated positions.
+# The wider upstream reach that the seqArchR stage needs in order to see the TATA box is
+# not useful here, and it dilutes the logos it is added to.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -27,9 +29,9 @@ Rscript scripts/05_tss_end_types/10_motif_by_dinuc_class.R \
     --genome     data/sacCer3.fa \
     --outdir     results/motifs \
     --figdir     results/figures \
-    --types      1Sg,M,2Sgg,1Sa,1Sc,1St \
-    --upstream   35 \
-    --downstream 20 \
+    --types      1Sg,M,2Sgg,2Stg,1Sa,2Sga,1Sc,1St \
+    --upstream   15 \
+    --downstream 15 \
     --min_reads  200 \
     --min_ess    100 \
     $FORCE

@@ -19,7 +19,15 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-[[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
 
 CONDA_ENV="$(yaml_get conda_env_r "$PARAMS")"
 RSCRIPT=$(conda run -n "$CONDA_ENV" which Rscript)
@@ -29,39 +37,39 @@ log_info "Stage 8: TSS end-type matrix"
 log_info "  step 1: build typed CTSS"
 $RSCRIPT "$SCRIPT_DIR/01_build_ctss.R" \
     --samples "$SAMPLES" \
-    --outdir  "$ROOT_DIR/results/tss" \
+    --outdir  "$RESULTS_ROOT/tss" \
     --params  "$PARAMS" \
     $FORCE_FLAG
 
 log_info "  step 2: cluster + annotate"
 $RSCRIPT "$SCRIPT_DIR/02_cluster_annotate.R" \
-    --ctss    "$ROOT_DIR/results/tss/typed_ctss.tsv.gz" \
+    --ctss    "$RESULTS_ROOT/tss/typed_ctss.tsv.gz" \
     --samples "$SAMPLES" \
-    --outdir  "$ROOT_DIR/results/tss" \
+    --outdir  "$RESULTS_ROOT/tss" \
     --params  "$PARAMS" \
     $FORCE_FLAG
 
 log_info "  step 3: plot"
 $RSCRIPT "$SCRIPT_DIR/03_plot.R" \
-    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --matrix  "$RESULTS_ROOT/tss/tss_matrix.tsv" \
     --samples "$SAMPLES" \
-    --outdir  "$ROOT_DIR/results/figures" \
+    --outdir  "$RESULTS_ROOT/figures" \
     --params  "$PARAMS" \
     $FORCE_FLAG
 
 log_info "  step 4: cluster + annotate"
 $RSCRIPT "$SCRIPT_DIR/04_cluster_annotate.R" \
-    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --matrix  "$RESULTS_ROOT/tss/tss_matrix.tsv" \
     --samples "$SAMPLES" \
-    --outdir  "$ROOT_DIR/results/tss" \
+    --outdir  "$RESULTS_ROOT/tss" \
     --params  "$PARAMS" \
     $FORCE_FLAG
 
 log_info "  step 5: plot clusters"
 $RSCRIPT "$SCRIPT_DIR/05_plot_clusters.R" \
-    --clustered  "$ROOT_DIR/results/tss/tss_clustered.tsv" \
-    --hclust_rds "$ROOT_DIR/results/tss/tss_hclust.rds" \
-    --outdir     "$ROOT_DIR/results/figures" \
+    --clustered  "$RESULTS_ROOT/tss/tss_clustered.tsv" \
+    --hclust_rds "$RESULTS_ROOT/tss/tss_hclust.rds" \
+    --outdir     "$RESULTS_ROOT/figures" \
     $FORCE_FLAG
 
 log_info "Stage 8+9 complete."

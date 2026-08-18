@@ -4,13 +4,14 @@
 #
 # Usage:
 #   bash scripts/04_dinuc/00_select_bam.sh [--bam_dir DIR] [--out_dir DIR] \
-#       [--samples FILE] [--params FILE] [--types "1Sg 2Sgg"] [--force]
+#       [--samples FILE] [--params FILE] [--types "1Sg 2Sgg"] \
+#       [--sheet_prefix STEM] [--force]
 #
 # Outputs:
 #   <out_dir>/{sample_id}_1Sg.bam  (and .bai)
 #   <out_dir>/{sample_id}_2Sgg.bam  (and .bai)
-#   config/samples_1Sg.tsv
-#   config/samples_2Sgg.tsv
+#   config/<sheet_prefix>_1Sg.tsv   (default prefix: samples)
+#   config/<sheet_prefix>_2Sgg.tsv
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,7 +23,12 @@ PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 BAM_DIR=""
 OUT_DIR=""
-TYPES="1Sg 2Sgg 3Sggg 1Sa 1St 1Sc M"
+end_types="$(yaml_get end_types "$PARAMS")"
+TYPES="${end_types:-1Sg 2Sgg 3Sggg 2Stg 1Sa 2Sga 1St 1Sc M}"
+# Basename stem for the generated per-type sample sheets. It must differ between
+# datasets, because these sheets are written into config/ under a fixed name and
+# a second dataset would otherwise overwrite the first dataset's sheets in place.
+SHEET_PREFIX="samples"
 FORCE=0
 
 while [[ $# -gt 0 ]]; do
@@ -32,6 +38,7 @@ while [[ $# -gt 0 ]]; do
         --samples)  SAMPLES="$2";  shift 2 ;;
         --params)   PARAMS="$2";   shift 2 ;;
         --types)    TYPES="$2";    shift 2 ;;
+        --sheet_prefix) SHEET_PREFIX="$2"; shift 2 ;;
         --force)    FORCE=1;       shift   ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -77,7 +84,7 @@ done
 
 # Build per-type samples TSVs (header line first)
 for TYPE in $TYPES; do
-    TSV_OUT="$ROOT_DIR/config/samples_${TYPE}.tsv"
+    TSV_OUT="$ROOT_DIR/config/${SHEET_PREFIX}_${TYPE}.tsv"
     echo "$header" > "$TSV_OUT"
 done
 
@@ -118,7 +125,7 @@ done < <(grep -v '^#' "$SAMPLES")
 # Re-build per-type TSVs cleanly (done separately to avoid subshell issues)
 for TYPE in $TYPES; do
     SPEC="$(select_spec "$TYPE")"
-    TSV_OUT="$ROOT_DIR/config/samples_${TYPE}.tsv"
+    TSV_OUT="$ROOT_DIR/config/${SHEET_PREFIX}_${TYPE}.tsv"
     # header
     echo "$header" > "$TSV_OUT"
     # rows: replace bam column with selected BAM path
@@ -134,4 +141,4 @@ for TYPE in $TYPES; do
     log_info "Written: $TSV_OUT"
 done
 
-log_info "Selection complete. Run dinuc with --samples config/samples_1Sg.tsv or samples_2Sgg.tsv"
+log_info "Selection complete. Per-type sheets written as config/${SHEET_PREFIX}_<type>.tsv"

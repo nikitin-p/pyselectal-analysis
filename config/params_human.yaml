@@ -1,0 +1,210 @@
+# Pipeline parameters for the human LUHMES CAGE / NET-CAGE dataset.
+#
+# This file is a complete, standalone parameter set: every script reads a single
+# params file, so this one duplicates the yeast keys rather than inheriting them.
+# Pass it explicitly, for example:
+#
+#   bash run_analysis.sh --params config/params_human.yaml \
+#                        --samples config/samples_human.tsv
+#
+# All paths are relative to the project root unless they are absolute. The
+# absolute paths below point at the remote cluster (/home/pnikitin/cage), so this
+# file only works when the pipeline runs there.
+
+# ── Reference genome and index ───────────────────────────────────────────────
+# The reference is GRCh38 (GENCODE release 38), built on this cluster with
+# --genomeSAsparseD 2 and --sjdbOverhang 49. The FASTA below MUST be the exact
+# file the index was built from, because the downstream stages read sequence from
+# it with getSeq() against seqlevels taken from the BAMs, and any mismatch in
+# contig naming surfaces as a silent loss of ranges rather than as an error.
+#
+# The primary assembly is used deliberately, rather than the p13 assembly with
+# patch and haplotype scaffolds. Stage 1 runs --outFilterMultimapNmax 1 and keeps
+# only MAPQ 255, so with alt contigs present a read matching both a primary locus
+# and its alt copy would be multi-mapping and would be dropped at mapping time,
+# unrecoverably and without any error. That loss would fall hardest on
+# polymorphic, gene-dense regions such as the MHC.
+star_index_human:   "/home/pnikitin/cage/hg38/star_hg38"
+genome_fasta_human: "/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa"
+genome_sizes_human: ""   # derive from the .fai beside the FASTA if a stage needs it
+
+# The yeast keys are kept so that a script reading this file never sees a
+# missing key; they are unused by the human samples.
+star_index_hg38:    ""
+star_index_saccer3: ""
+
+# ── Results tree ─────────────────────────────────────────────────────────────
+# Root beneath which every stage writes; the yeast run uses "results".
+results_root: "results_human"
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+# The results tree is separate from the yeast one, because per-sample outputs
+# are keyed by sample_id but the aggregate tables and figures are not, and a
+# shared tree would let a human run overwrite the yeast results in place.
+pyselectal: "pyselectal.py"
+conda_env_star:       "star"
+conda_env_tools:      "samtools"
+conda_env_pyselectal: "samtools"
+conda_env_r:          "r_cage"
+conda_env_seqarchr:   "seqarchr"
+results_bam:           "results_human/bam"
+results_bam_sub:       "results_human/bam_subsampled"
+results_five_prime:    "results_human/five_prime"
+results_figures:       "results_human/figures"
+results_qc:            "results_human/qc"
+
+# ── STAR mapping ─────────────────────────────────────────────────────────────
+# The node has 20 CPU and 40 GB RAM in total, which a standard human index does
+# not comfortably fit: it loads at roughly 27-32 GB and leaves nothing for the
+# BAM sort buffer. The index is therefore built with --genomeSAsparseD 2, which
+# halves suffix-array density and brings the loaded index down to roughly
+# 17-20 GB, at a cost of about 10-20 % in mapping speed.
+threads: 16
+mapq_threshold: 255
+star_extra_args: "--alignEndsType Local --outSAMattributes NH HI AS NM"
+# STAR --limitBAMsortRAM, in bytes. The yeast value of 3 GB does not carry over,
+# because STAR needs sorting memory on top of the loaded index. The budget below
+# assumes the sparse index (about 17-20 GB loaded) inside 40 GB total, which
+# leaves roughly 10 GB for sorting once the operating system and the read buffers
+# are accounted for. Too small a budget is not a graceful degradation: STAR
+# spills into thousands of temporary files and then fails at the merge step. If
+# mapping proves too tight, switch to `--outSAMtype BAM Unsorted` plus a separate
+# `samtools sort -m`, which sorts in bounded memory, rather than lowering this.
+star_limit_bam_sort_ram: 10000000000
+
+# ── Subsampling ──────────────────────────────────────────────────────────────
+# CAGE and NET-CAGE libraries differ systematically in depth, so the Tukey lower
+# fence is applied within the pooled set as it is for yeast; if it excludes a
+# whole assay rather than an outlier library, subsample per assay instead.
+subsample_seed: 42
+subsample_factor: 0.95
+
+# ── pyselectal --count ───────────────────────────────────────────────────────
+collapse_threshold: 0.1
+mapped_prefix: 5
+
+# ── Stage 6: per-type BAM selection ──────────────────────────────────────────
+# The end-type vocabulary, mirroring scripts/utils/end_types.R for the one bash
+# consumer that cannot source R. Keep the two in the same order; the R file is
+# authoritative and test/run_end_types_test.sh checks that they agree.
+end_types: "1Sg 2Sgg 3Sggg 2Stg 1Sa 2Sga 1St 1Sc M"
+
+# ── Annotation ───────────────────────────────────────────────────────────────
+# The GTF is the one the index was built with, so its contig names match the BAMs.
+# TODO(build): Stage 9 needs a gene-level BED6 derived from this GTF in the same
+# way scripts/00_setup/make_yeast_gene_bed.sh derives the yeast BED. The name
+# column must hold whatever key go_keytype names, so that Stage 16 can look genes
+# up in org.Hs.eg.db without a second mapping step.
+annotation_gtf_human: "/home/pnikitin/cage/hg38/gencode.v38.primary_assembly.annotation.gtf"
+annotation_bed_human: ""
+annotation_bed_yeast: ""
+annotation_bed_hg38:  ""
+
+# Generic, dataset-neutral aliases read by the stage wrappers.
+# annotation_bed is built from the GTF above by
+# scripts/00_setup/make_human_gene_bed.sh, whose name column carries gene_name so
+# that it matches go_keytype below without an identifier translation step.
+genome_fasta:   "/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa"
+annotation_gtf: "/home/pnikitin/cage/hg38/gencode.v38.primary_assembly.annotation.gtf"
+annotation_bed: "data/GRCh38.genes.bed"
+go_orgdb:       "org.Hs.eg.db"
+
+# ── Repeat and satellite annotation (Stage 13) ───────────────────────────────
+# TODO(source): the previously listed rmsk.bed and censat BED files are in
+# T2T-CHM13v2.0 coordinates and are therefore unusable against this GRCh38 index.
+# A GRCh38 RepeatMasker track is needed instead, for example the UCSC hg38 rmsk
+# table. Note that hg38 does not resolve the centromeric satellite arrays that
+# T2T does, so the repetitive-versus-unique comparison is correspondingly weaker.
+rmsk_bed_human:   ""
+censat_bed_human: ""
+
+# ── Stage 10: CAGEr ──────────────────────────────────────────────────────────
+results_cager:                "results_human/cager"
+cager_tpm_threshold:          1
+cager_max_dist:               20
+cager_keep_singletons_above:  5
+cager_iqw_qlow:               0.1
+cager_iqw_qup:                0.9
+cager_iqw_tpm_threshold:      3
+
+# ── Stage 08: seqArchR sequence architectures ────────────────────────────────
+# The window is symmetric here, unlike the yeast one: the human core promoter
+# elements sit close to the TSS (TATA at about -30, and the Inr, DPE and MTE
+# within the first 40 bp), so the 150 bp upstream used for yeast is unnecessary.
+seqarchr_upstream:   50
+seqarchr_downstream: 50
+seqarchr_min_total:  2
+seqarchr_total_itr:  4
+seqarchr_chunk_size: 500
+seqarchr_cv_folds:   5
+seqarchr_n_cores:    6
+# TODO(choose): the cut point must be read off this dataset's own collation
+# dendrogram heights, never carried over from the yeast value of 8 and never
+# chosen from the end-type labels.
+seqarchr_n_arch:     8
+seqarchr_seed:       42
+
+# ── Stage 11: expression dynamics ────────────────────────────────────────────
+expr_min_pct_1Sg: 70
+
+# ── R analysis — replicate heatmap (Stage 4) ─────────────────────────────────
+replicate_hclust_method: "complete"
+chisq_min_count: 5
+
+# ── R analysis — dinucleotide z-score heatmap (Stage 7) ──────────────────────
+dinuc_hclust_method: "ward.D2"
+dinuc_dist_method:   "euclidean"
+
+# ── Literature RT non-templated nucleotide addition preferences (Stage 5) ────
+rt_nontemplated_prefs:
+  A: 0.10
+  C: 0.50
+  G: 0.25
+  T: 0.15
+
+# ── Stage 16: GO Biological Process enrichment ───────────────────────────────
+# The windows are wider than the yeast ones because human intergenic distances
+# are far larger and a 500 bp upstream window would leave most TSS clusters
+# unassigned.
+results_go:           "results_human/go"
+go_quantile:          0.90
+go_min_type_reads:    2
+go_min_total:         2
+go_upstream_window:   1000
+go_downstream_window: 200
+go_pvalue_cutoff:     0.05
+go_qvalue_cutoff:     0.2
+go_simplify_cutoff:   0.7
+go_min_set_size:      10
+go_orgdb_yeast:       ""
+go_orgdb_human:       "org.Hs.eg.db"
+go_keytype:           "SYMBOL"
+
+# ── Stage 17: single-type-dominated TSSs ─────────────────────────────────────
+results_dominance:        "results_human/dominance"
+dom_min_depth:            25
+dom_thresholds:           [0.7, 0.8]
+dom_min_samples:          9       # 18 libraries here, against 8 for yeast
+dom_min_reads_per_sample: 5
+dom_fdr:                  0.05
+dom_max_clip:             4
+dom_min_class_size:       10
+dom_min_total:            5       # MUST equal Stage 8's --min_total
+dom_max_dist:             20      # MUST equal Stage 8's --max_dist
+
+# ── Stage 18: A−8 saturation of <5' end type, dinucleotide> pairs ────────────
+# TODO(re-derive): the background window below is the one frozen for yeast. The
+# human per-position A profile must be inspected first, and the plateau chosen
+# from it, before any pairwise test is run.
+results_a8:              "results_human/a8"
+a8_upstream:             20
+a8_obs_coord:            -8
+a8_bg_plateau:           [-20, -19, -18, -17, -16, -15, -14, -13, -12, -11]
+a8_bg_proximal:          [-2, -3, -4, -5, -6, -7, -9]
+a8_min_type_reads:       2
+a8_min_positions:        200
+a8_n_boot:               1000
+a8_seed:                 42
+a8_fdr:                  0.05
+a8_min_total:            5       # MUST equal Stage 8's --min_total
+a8_max_dist:             20      # MUST equal Stage 8's --max_dist

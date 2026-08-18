@@ -1,0 +1,234 @@
+#!/usr/bin/env Rscript
+# Stage 19 step 2: the composite exotic-origins figure.
+#
+# Panel A, the split bar, asks where the signal of each exotic 5' end type comes
+# from. Each exotic type carries two adjacent bars, one counting alignments and
+# one counting the distinct CTSS positions that carry them, and each bar is
+# stacked to 100 % by the origin of the position. The two currencies are shown
+# side by side because they answer different questions and routinely disagree: a
+# type can draw most of its reads from a handful of deep 1Sg-dominated sites
+# while occurring mostly at shallow ones. The bars are proportions rather than
+# raw counts because M outweighs every other exotic type by roughly two orders
+# of magnitude, so a shared count axis would flatten all the others; the totals
+# are printed above each bar instead.
+#
+# Panels B and C are rainclouds of how productive those positions are, split by
+# the same four origins. B measures the total depth of the position with every
+# type pooled, C the exotic reads alone. Together they separate "exotic reads
+# occur at productive sites" from "sites that are themselves productive in
+# exotic reads", which the first panel cannot distinguish.
+#
+# Usage (from project root):
+#   Rscript scripts/12_exotic_origins/02_origins_figure.R \
+#       [--dominance      results/exotic_origins/position_dominance.tsv.gz] \
+#       [--ctss           results/dominance/fine_typed_ctss.tsv.gz]         \
+#       [--cluster_counts results/dominance/cluster_type_counts.tsv]        \
+#       [--outdir         results/exotic_origins]                           \
+#       [--figdir         results/figures]                                  \
+#       [--params         config/params.yaml] [--force]
+
+suppressPackageStartupMessages({
+  library(data.table)
+  library(ggplot2)
+  library(patchwork)
+  library(yaml)
+})
+
+args <- commandArgs(trailingOnly = TRUE)
+get_arg <- function(flag, default = NULL) {
+  i <- which(args == flag)
+  if (length(i) == 0) return(default)
+  args[i + 1]
+}
+dom_f    <- get_arg("--dominance", "results/exotic_origins/position_dominance.tsv.gz")
+ctss_f   <- get_arg("--ctss",      "results/dominance/fine_typed_ctss.tsv.gz")
+clus_f   <- get_arg("--cluster_counts", "results/dominance/cluster_type_counts.tsv")
+outdir   <- get_arg("--outdir",    "results/exotic_origins")
+figdir   <- get_arg("--figdir",    "results/figures")
+params_f <- get_arg("--params",    "config/params.yaml")
+force    <- "--force" %in% args
+
+script_dir <- dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE),
+                                               value = TRUE)[1]))
+source(file.path(script_dir, "exo_helpers.R"))
+
+params    <- yaml.load_file(params_f)
+top_n     <- as.integer(params$exo_top_types)
+point_cap <- as.integer(params$exo_point_cap)
+seed      <- as.integer(params$exo_seed)
+min_total <- as.integer(params$dom_min_total)
+
+dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
+dir.create(figdir, recursive = TRUE, showWarnings = FALSE)
+out_tsv <- file.path(outdir, "exotic_tallies.tsv")
+if (!force && file.exists(out_tsv)) {
+  message("Output exists, skipping (use --force to rerun): ", out_tsv)
+  quit(save = "no", status = 0)
+}
+
+# ── input ─────────────────────────────────────────────────────────────────────
+
+ctss <- fread(ctss_f)
+ctss[, position_id := paste(chr, strand, pos, sep = ":")]
+pooled <- ctss[, .(n = sum(n)), by = .(position_id, type)]
+
+dom  <- fread(dom_f)
+omap <- dom[, .(position_id, origin = factor(origin, levels = ORIGIN_LEVELS))]
+stopifnot(!anyNA(omap$origin))
+
+tal  <- exotic_tallies(pooled, omap, top_n = top_n)
+expr <- exotic_expression(pooled, omap)
+
+# ── invariants ────────────────────────────────────────────────────────────────
+
+# Every exotic read must be drawn exactly once: the per-type bars, the pooled
+# "All exotics" bar and the raw table must all agree.
+n_exotic <- pooled[type != "1Sg", sum(n)]
+stopifnot(tal[type_label != "All exotics" & measure == "alignments",
+              sum(count)] == n_exotic)
+stopifnot(tal[type_label == "All exotics" & measure == "alignments",
+              sum(count)] == n_exotic)
+stopifnot(expr[, sum(exotic_depth)] == n_exotic)
+
+# Cross-check against Stage 17. Its cluster-level table covers exactly the
+# positions that reached the Stage 8 floor, so the two tallies must agree once
+# this stage's positions are restricted the same way. A mismatch means the two
+# stages are reading different data and every comparison between them is void.
+if (file.exists(clus_f)) {
+  ref <- fread(clus_f)[, .(ref_n = sum(n)), by = type]
+  deep <- pooled[, tot := sum(n), by = position_id][tot >= min_total]
+  own  <- deep[, .(own_n = sum(n)), by = type]
+  cmp  <- merge(ref, own, by = "type", all = TRUE)
+  cmp[is.na(ref_n), ref_n := 0][is.na(own_n), own_n := 0]
+  if (!isTRUE(all.equal(cmp$ref_n, cmp$own_n))) {
+    stop("Per-type totals disagree with Stage 17's cluster_type_counts.tsv ",
+         "when restricted to positions with pooled depth >= ", min_total,
+         ". Check that dom_min_total matches the value Stage 17 ran with.")
+  }
+  pooled[, tot := NULL]
+  message("Cross-check against Stage 17 cluster_type_counts.tsv: OK (",
+          nrow(cmp), " types)")
+} else {
+  message("Stage 17 cluster_type_counts.tsv not found, cross-check skipped")
+}
+
+expr_summ <- expr[, .(n_positions = .N,
+                      median_total  = as.numeric(median(total_depth)),
+                      q25_total     = as.numeric(quantile(total_depth, 0.25)),
+                      q75_total     = as.numeric(quantile(total_depth, 0.75)),
+                      median_exotic = as.numeric(median(exotic_depth)),
+                      q25_exotic    = as.numeric(quantile(exotic_depth, 0.25)),
+                      q75_exotic    = as.numeric(quantile(exotic_depth, 0.75))),
+                  by = origin]
+setorder(expr_summ, origin)
+fwrite(expr_summ, file.path(outdir, "exotic_expression_summary.tsv"), sep = "\t")
+print(expr_summ)
+
+# The per-position table is written out as well as summarised, because the
+# Quarto report redraws the rainclouds at render time and a median with an
+# interquartile range cannot reproduce a distribution. It is the only table of
+# this stage that is per-position rather than per-class, and it is small enough
+# to keep compressed alongside the summaries.
+fwrite(expr[, .(position_id, origin, total_depth, exotic_depth)],
+       file.path(outdir, "exotic_expression.tsv.gz"), sep = "\t",
+       compress = "gzip")
+
+# ── palette ───────────────────────────────────────────────────────────────────
+
+ORIGIN_COLS <- c(Sg_dom       = "#1f78b4",
+                 Sgg_dom      = "#33a02c",
+                 other_called = "#ff7f00",
+                 not_callable = "#bdbdbd")
+present <- ORIGIN_LEVELS[ORIGIN_LEVELS %in% as.character(omap$origin)]
+
+# ── panel A: the split bar ────────────────────────────────────────────────────
+
+tal[, measure_lab := factor(measure, levels = c("alignments", "positions"),
+                            labels = c("aln", "pos"))]
+bar_tot <- tal[, .(total = sum(count)), by = .(type_label, measure_lab)]
+fmt_n <- function(x) formatC(x, format = "d", big.mark = " ")
+
+pA <- ggplot(tal, aes(measure_lab, count, fill = origin)) +
+  geom_col(position = "fill", width = 0.75) +
+  geom_text(data = bar_tot, inherit.aes = FALSE,
+            aes(measure_lab, 1.03, label = fmt_n(total)),
+            size = 2.1, angle = 90, hjust = 0) +
+  facet_grid(cols = vars(type_label), switch = "x") +
+  # The headroom for the printed totals is set through coord_cartesian and not
+  # through the scale's limits: position = "fill" is applied after the scale, so
+  # a limit here would drop every raw count above it before the bar is stacked.
+  scale_y_continuous(labels = scales::percent,
+                     breaks = c(0, 0.25, 0.5, 0.75, 1)) +
+  coord_cartesian(ylim = c(0, 1.3)) +
+  scale_fill_manual(values = ORIGIN_COLS, breaks = present,
+                    labels = ORIGIN_LABELS) +
+  labs(x = NULL, y = "share of the bar",
+       fill = "origin of the position",
+       title = "A  Where the exotic 5' end types come from",
+       subtitle = paste0("Exotic means every fine type other than 1Sg, so M is ",
+                         "included.\nThe left bar of each pair counts ",
+                         "alignments and the right bar counts the distinct CTSS ",
+                         "positions that carry them; totals are printed above.")) +
+  theme_bw(base_size = 9) +
+  theme(panel.spacing.x = unit(1.5, "pt"),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text.x = element_text(angle = 90, hjust = 1, size = 7),
+        legend.position = "top")
+
+# ── panels B and C: the rainclouds ────────────────────────────────────────────
+
+# ggdist is not installed in this project's R libraries, so each row is drawn
+# from three layers by hand: the half violin as a polygon above the row's
+# baseline, a narrow box just below it, and thinned jittered points below that.
+raincloud <- function(dt, value_col, title, xlab) {
+  d <- copy(dt)
+  d[, val := log10(get(value_col))]
+  d <- d[is.finite(val)]
+  # The rows are drawn bottom-up, so the order is reversed here to make the
+  # topmost row the first origin of the legend and of panel A's stack.
+  ord <- rev(present)
+  d[, idx := match(as.character(origin), ord)]
+  hv  <- half_violin_data(d, "val", "origin", ord, height = 0.42)
+  pts <- thin_by_group(d, "origin", cap = point_cap, seed = seed)
+
+  # A group too small or too flat for a kernel density contributes no polygon,
+  # which happens on the test fixture and could happen on a sparse real class.
+  # The layer is then omitted rather than fed an empty frame, because an empty
+  # frame carries no columns for the aesthetics to resolve against.
+  violin_layer <- if (nrow(hv) > 0) {
+    geom_polygon(data = hv, aes(x, y, group = group, fill = group),
+                 alpha = 0.75, colour = NA)
+  } else NULL
+
+  ggplot() +
+    violin_layer +
+    geom_boxplot(data = d, aes(x = val, y = idx - 0.14, group = origin),
+                 orientation = "y", width = 0.16, linewidth = 0.3,
+                 outlier.shape = NA, fill = "white") +
+    geom_jitter(data = pts, aes(x = val, y = idx - 0.34),
+                height = 0.09, size = 0.15, alpha = 0.25, colour = "grey25") +
+    scale_y_continuous(breaks = seq_along(ord),
+                       labels = ORIGIN_LABELS[ord],
+                       expand = expansion(add = c(0.5, 0.6))) +
+    scale_fill_manual(values = ORIGIN_COLS, guide = "none") +
+    labs(x = xlab, y = NULL, title = title) +
+    theme_bw(base_size = 9)
+}
+
+pB <- raincloud(expr, "total_depth",
+                "B  Depth of those positions, all end types pooled",
+                expression(log[10]~"pooled alignments at the position"))
+pC <- raincloud(expr, "exotic_depth",
+                "C  Depth of those positions, exotic reads only",
+                expression(log[10]~"pooled exotic alignments at the position"))
+
+p <- pA / pB / pC + plot_layout(heights = c(1.35, 1, 1))
+ggsave(file.path(figdir, "20_exo_origins.pdf"), p, width = 11, height = 13)
+message("Written: ", file.path(figdir, "20_exo_origins.pdf"))
+
+# The tables are the sentinel, so the figure is written first: a failing ggsave
+# must not leave a table behind that makes the next run skip this step.
+fwrite(tal, out_tsv, sep = "\t")
+message("Written: ", out_tsv)
+sessionInfo()

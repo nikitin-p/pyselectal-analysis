@@ -23,6 +23,17 @@ suppressPackageStartupMessages({
   library(yaml)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by a test) rather than run directly,
+# commandArgs(FALSE) reflects the OUTER script's --file, not this file's own
+# path, so the path above can resolve to the wrong directory depth. Fall back
+# to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -168,21 +179,12 @@ pos_to_cluster <- total_ctss[, .(chr, pos, strand, cluster_id)]
 # Keep only CTSS positions that passed the min_total filter
 ctss_filtered <- merge(ctss, pos_to_cluster, by = c("chr", "pos", "strand"))
 
-tss_matrix <- ctss_filtered[, .(
-  n_1Sg   = sum(n_1Sg),
-  n_2Sgg  = sum(n_2Sgg),
-  n_3Sggg = sum(n_3Sggg),
-  n_1Sa   = sum(n_1Sa),
-  n_1St   = sum(n_1St),
-  n_1Sc   = sum(n_1Sc),
-  n_M     = sum(n_M),
-  n_other = sum(n_other),
-  n_total = sum(n_total)
-), by = .(cluster_id, sample_id)]
+n_cols <- end_type_cols("n_", c(END_TYPES, "total"))
+tss_matrix <- ctss_filtered[, lapply(.SD, sum), .SDcols = n_cols,
+                            by = .(cluster_id, sample_id)]
 
 # Compute percentages
-all_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M", "other")
-for (typ in all_types) {
+for (typ in END_TYPES) {
   n_col <- paste0("n_", typ)
   p_col <- paste0("pct_", typ)
   tss_matrix[n_total > 0, (p_col) := 100 * get(n_col) / n_total]
@@ -193,10 +195,8 @@ for (typ in all_types) {
 tss_matrix <- merge(tss_matrix, dominant, by = "cluster_id")
 
 setcolorder(tss_matrix, c(
-  "cluster_id", "chr", "tss_pos", "strand", "initiator",
-  "sample_id",
-  paste0("n_", all_types), "n_total",
-  paste0("pct_", all_types)
+  "cluster_id", "chr", "tss_pos", "strand", "initiator", "sample_id",
+  end_type_cols("n_"), "n_total", end_type_cols("pct_")
 ))
 setorder(tss_matrix, cluster_id, sample_id)
 

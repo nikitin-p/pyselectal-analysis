@@ -28,6 +28,17 @@ source(if (length(.f))
          file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
        else "scripts/utils/plot_helpers.R")
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by test/test_build_ctss_types.R) rather
+# than run directly, commandArgs(FALSE) reflects the OUTER script's --file,
+# not this file's own path, so the path above can resolve to the wrong
+# directory depth. Fall back to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # Paths
 results_dir <- "results"
 fig_dir <- file.path(results_dir, "figures")
@@ -118,8 +129,7 @@ agg_long <- agg_by_dinuc %>%
   )
 
 # Colors for end types
-end_type_colors <- c("1Sg" = "#2166ac", "2Sgg" = "#67a9cf", "3Sggg" = "#d1e5f0",
-                     "other" = "#adb5bd", "M" = "#b2182b")
+end_type_colors <- END_TYPE_COLORS_TAB10
 
 # Canonical initiator (YR) axis label colors
 yr_dinucs <- c("CA", "CG", "TA", "TG")

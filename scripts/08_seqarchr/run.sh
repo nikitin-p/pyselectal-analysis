@@ -16,11 +16,31 @@ source "$ROOT_DIR/scripts/utils/log.sh"
 source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 
 PARAMS="$ROOT_DIR/config/params.yaml"
+SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-[[ "${1:-}" == "--force" ]] && FORCE_FLAG="--force"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
+done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
 
-OUTDIR="$ROOT_DIR/results/seqarchr"
-FIGDIR="$ROOT_DIR/results/figures"
+# Genome and annotation come from the params file, so that switching datasets is
+# a change of params file rather than a change of script. Relative paths are
+# resolved against the project root; absolute paths are used as given.
+resolve_path() {
+    local v="$1"
+    [[ -z "$v" ]] && { printf ''; return; }
+    [[ "$v" != /* ]] && v="$ROOT_DIR/$v"
+    printf '%s' "$v"
+}
+GENOME_FASTA="$(resolve_path "$(yaml_get genome_fasta "$PARAMS")")"
+
+OUTDIR="$RESULTS_ROOT/seqarchr"
+FIGDIR="$RESULTS_ROOT/figures"
 
 UPSTREAM="$(yaml_get seqarchr_upstream   "$PARAMS")"
 DOWNSTREAM="$(yaml_get seqarchr_downstream "$PARAMS")"
@@ -44,8 +64,8 @@ RSCRIPT="$(which Rscript)"
 
 log_info "Stage 08 step 1: extracting promoter windows"
 $RSCRIPT "$SCRIPT_DIR/01_prepare_seqs.R" \
-    --tss        "$ROOT_DIR/results/tss/tss_clustered.tsv" \
-    --genome     "$ROOT_DIR/data/sacCer3.fa" \
+    --tss        "$RESULTS_ROOT/tss/tss_clustered.tsv" \
+    --genome     "$GENOME_FASTA" \
     --outdir     "$OUTDIR" \
     --upstream   "$UPSTREAM" \
     --downstream "$DOWNSTREAM" \

@@ -2,8 +2,8 @@
 # Stage 9 step 1: hierarchical clustering of TSS by end-type vector +
 # strand-aware BED annotation (overlap → sense/antisense genic; else intergenic).
 #
-# Clustering: average pct_1Sg/2Sgg/3Sggg/M/other across all samples per TSS →
-# Euclidean distance → Ward.D2 linkage → cut at --k_clusters (default 6).
+# Clustering: average pct_1Sg/2Sgg/3Sggg/2Stg/2Sga/M/other across all samples
+# per TSS → Euclidean distance → Ward.D2 linkage → cut at --k_clusters (default 6).
 #
 # Annotation: for each dominant TSS position, intersect with the gene annotation
 # BED (strand-aware). TSS overlapping a gene on the same strand → "sense_genic";
@@ -29,6 +29,17 @@ suppressPackageStartupMessages({
   library(readr)
   library(yaml)
 })
+
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by test/test_build_ctss_types.R) rather
+# than run directly, commandArgs(FALSE) reflects the OUTER script's --file,
+# not this file's own path, so the path above can resolve to the wrong
+# directory depth. Fall back to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 # ── argument parsing ──────────────────────────────────────────────────────────
 args <- commandArgs(trailingOnly = TRUE)
@@ -81,18 +92,20 @@ mat_f <- mat[cluster_id %in% keep_ids]
 message("  clusters with >= ", min_samples, " samples: ", length(keep_ids))
 
 # Average pct values across all samples (ignoring NA / zero-coverage)
-avg <- mat_f[n_total > 0, .(
-  mean_pct_1Sg   = mean(pct_1Sg,   na.rm = TRUE),
-  mean_pct_2Sgg   = mean(pct_2Sgg,   na.rm = TRUE),
-  mean_pct_3Sggg = mean(pct_3Sggg, na.rm = TRUE),
-  mean_pct_M     = mean(pct_M,     na.rm = TRUE),
-  mean_pct_other = mean(pct_other, na.rm = TRUE),
-  mean_total     = mean(n_total,   na.rm = TRUE)
-), by = .(cluster_id, chr, tss_pos, strand, initiator)]
+mean_cols <- end_type_cols("mean_pct_", END_TYPES)
+avg <- mat_f[n_total > 0,
+             c(lapply(.SD, mean, na.rm = TRUE), .(mean_total = mean(n_total, na.rm = TRUE))),
+             .SDcols = end_type_cols("pct_", END_TYPES),
+             by = .(cluster_id, chr, tss_pos, strand, initiator)]
+setnames(avg, end_type_cols("pct_", END_TYPES), mean_cols)
 
 # ── hierarchical clustering ───────────────────────────────────────────────────
-# Euclidean distance on 5-component end-type vector; Ward.D2 linkage.
-feat_cols <- c("mean_pct_1Sg", "mean_pct_2Sgg", "mean_pct_3Sggg", "mean_pct_M", "mean_pct_other")
+# Euclidean distance on a 7-component end-type vector; Ward.D2 linkage.
+# 2Stg and 2Sga join the five original components because they are each as
+# abundant as 2Sgg, which was already a component; leaving them inside
+# mean_pct_other would let the clustering treat 3.1% of reads as undifferentiated.
+feat_cols <- end_type_cols("mean_pct_",
+                           c("1Sg", "2Sgg", "3Sggg", "2Stg", "2Sga", "M", "other"))
 feat_mat  <- as.matrix(avg[, ..feat_cols])
 rownames(feat_mat) <- avg$cluster_id
 

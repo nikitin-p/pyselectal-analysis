@@ -20,9 +20,15 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-for arg in "$@"; do
-    if [[ "$arg" == "--force" ]]; then FORCE_FLAG="--force"; fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
 done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
 
 # The r_cage environment may be absent; the system R library carries every
 # package this stage needs, so fall back to it rather than failing.
@@ -46,9 +52,9 @@ log_info "Stage 18: A-8 saturation of <5' end type, dinucleotide> pairs"
 
 log_info "  step 1: windows"
 log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/01_build_windows.R" \
-    --ctss    "$ROOT_DIR/results/tss/typed_ctss.tsv.gz" \
+    --ctss    "$RESULTS_ROOT/tss/typed_ctss.tsv.gz" \
     --samples "$SAMPLES" \
-    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --matrix  "$RESULTS_ROOT/tss/tss_matrix.tsv" \
     --outdir  "$A8_DIR" \
     --params  "$PARAMS" $FORCE_FLAG
 

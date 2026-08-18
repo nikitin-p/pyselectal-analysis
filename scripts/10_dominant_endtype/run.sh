@@ -19,11 +19,15 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
-for arg in "$@"; do
-    if [[ "$arg" == "--force" ]]; then
-        FORCE_FLAG="--force"
-    fi
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --params)  PARAMS="$2";  shift 2 ;;
+        --samples) SAMPLES="$2"; shift 2 ;;
+        --force)   FORCE_FLAG="--force"; shift ;;
+        *) die "Unknown argument: $1" ;;
+    esac
 done
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
 
 # The r_cage environment may be absent; the system R library carries every
 # package this stage needs, so fall back to it rather than failing.
@@ -53,7 +57,7 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/01_build_fine_ctss.R" \
 log_info "  step 2: clusters + dominance cascade"
 log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/02_dominance.R" \
     --ctss    "$DOM_DIR/fine_typed_ctss.tsv.gz" \
-    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --matrix  "$RESULTS_ROOT/tss/tss_matrix.tsv" \
     --outdir  "$DOM_DIR" \
     --params  "$PARAMS" $FORCE_FLAG
 
@@ -61,16 +65,16 @@ log_info "  step 3: expression by class"
 log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/03_expression.R" \
     --calls   "$DOM_DIR/dominance_calls.tsv" \
     --outdir  "$DOM_DIR" \
-    --figdir  "$ROOT_DIR/results/figures" \
+    --figdir  "$RESULTS_ROOT/figures" \
     --params  "$PARAMS" $FORCE_FLAG
 
 log_info "  step 4: genomic context"
 log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/04_context.R" \
     --calls   "$DOM_DIR/dominance_calls.tsv" \
-    --matrix  "$ROOT_DIR/results/tss/tss_matrix.tsv" \
+    --matrix  "$RESULTS_ROOT/tss/tss_matrix.tsv" \
     --samples "$SAMPLES" \
     --outdir  "$DOM_DIR" \
-    --figdir  "$ROOT_DIR/results/figures" $FORCE_FLAG
+    --figdir  "$RESULTS_ROOT/figures" $FORCE_FLAG
 
 log_info "Stage 17 complete."
 log_info "  calls    → results/dominance/dominance_calls.tsv"

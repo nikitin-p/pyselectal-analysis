@@ -49,6 +49,17 @@ source(if (length(.f))
          file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
        else "scripts/utils/plot_helpers.R")
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by test/test_build_ctss_types.R) rather
+# than run directly, commandArgs(FALSE) reflects the OUTER script's --file,
+# not this file's own path, so the path above can resolve to the wrong
+# directory depth. Fall back to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # ── dinucleotide classification ───────────────────────────────────────────────
 # Positions are CTSS ±1 bp (strand-aware): first base = −1, second base = +1
 # Y = pyrimidine (C/T), R = purine (A/G)
@@ -144,8 +155,7 @@ p_cond <- ggplot(yr_cond,
             colour = "grey25", show.legend = FALSE) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1),
                      breaks = seq(0, 1, 0.25), limits = c(0, 1.1)) +
-  scale_fill_manual(values = c("1Sg" = "#E64B35", "2Sgg" = "#F39B7F",
-                                "3Sggg" = "#F5B041", "all" = "#4DBBD5")) +
+  scale_fill_manual(values = c(END_TYPE_COLORS_BRIGHT, "all" = "#4DBBD5")) +
   labs(title = "YR proportion by condition",
        subtitle = "Labels give the summed CTSS score (alignments) pooled over replicates",
        x = NULL, y = "YR proportion (mean ± SD across replicates)",

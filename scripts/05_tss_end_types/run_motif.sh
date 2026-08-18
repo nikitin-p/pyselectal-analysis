@@ -21,8 +21,8 @@ Rscript scripts/05_tss_end_types/06_motif_analysis.R \
     --figdir     results/figures \
     --min_reads  10 \
     --top_pct    10 \
-    --upstream   50 \
-    --downstream 10 \
+    --upstream   15 \
+    --downstream 15 \
     $FORCE
 
 log_info "Motif analysis complete"

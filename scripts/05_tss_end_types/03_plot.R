@@ -44,8 +44,18 @@ force           <- "--force" %in% args
 
 dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
 
-# fmt_n(): compact count labels drawn on top of every histogram bar
 .f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by a test) rather than run directly,
+# commandArgs(FALSE) reflects the OUTER script's --file, not this file's own
+# path, so the path above can resolve to the wrong directory depth. Fall back
+# to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
+# fmt_n(): compact count labels drawn on top of every histogram bar
 source(if (length(.f))
          file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
        else "scripts/utils/plot_helpers.R")
@@ -70,22 +80,16 @@ cond_map <- meta[, c("sample_id", "condition", "replicate"), drop = FALSE]
 mat <- merge(mat, cond_map, by = "sample_id", all.x = TRUE)
 
 # ── condition-level aggregation (sum replicates, recompute pct) ───────────────
-cond_mat <- mat[, .(
-  n_1Sg   = sum(n_1Sg),
-  n_2Sgg   = sum(n_2Sgg),
-  n_3Sggg = sum(n_3Sggg),
-  n_M     = sum(n_M),
-  n_other = sum(n_other),
-  n_total = sum(n_total)
-), by = .(cluster_id, chr, tss_pos, strand, initiator, condition)]
+n_cols <- end_type_cols("n_", c(END_TYPES, "total"))
+cond_mat <- mat[, lapply(.SD, sum), .SDcols = n_cols,
+                by = .(cluster_id, chr, tss_pos, strand, initiator, condition)]
 
-cond_mat[n_total >= min_cond_reads, pct_1Sg   := 100 * n_1Sg   / n_total]
-cond_mat[n_total >= min_cond_reads, pct_2Sgg   := 100 * n_2Sgg   / n_total]
-cond_mat[n_total >= min_cond_reads, pct_3Sggg := 100 * n_3Sggg / n_total]
-cond_mat[n_total >= min_cond_reads, pct_M     := 100 * n_M     / n_total]
-cond_mat[n_total >= min_cond_reads, pct_other := 100 * n_other / n_total]
-cond_mat[n_total < min_cond_reads,
-         c("pct_1Sg","pct_2Sgg","pct_3Sggg","pct_M","pct_other") := NA_real_]
+for (typ in END_TYPES) {
+  n_col <- paste0("n_", typ)
+  p_col <- paste0("pct_", typ)
+  cond_mat[n_total >= min_cond_reads, (p_col) := 100 * get(n_col) / n_total]
+  cond_mat[n_total < min_cond_reads, (p_col) := NA_real_]
+}
 
 # ── Figure 1: heatmap pct_1Sg sorted by mean across conditions ───────────────
 message("  heatmap: ", out_heat)
@@ -134,9 +138,9 @@ keep_init   <- init_counts[N >= 5, initiator]
 
 box_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg)] |>
   as.data.frame() |>
-  pivot_longer(cols = c(pct_1Sg, pct_2Sgg, pct_3Sggg),
-               names_to = "end_type", values_to = "pct") |>
-  mutate(end_type = recode(end_type, pct_1Sg = "1Sg", pct_2Sgg = "2Sgg", pct_3Sggg = "3Sggg"))
+  pivot_longer(cols = all_of(end_type_cols("pct_", END_TYPES_REAL)),
+               names_to = "end_type", values_to = "pct") %>%
+  mutate(end_type = factor(sub("^pct_", "", end_type), levels = END_TYPES))
 
 # Order initiators by median pct_1Sg descending
 init_order <- box_dat |>
@@ -150,8 +154,7 @@ init_label_colors <- ifelse(init_order$initiator %in% canonical, "#e63946", "bla
 
 p_box <- ggplot(box_dat, aes(x = initiator, y = pct, fill = end_type)) +
   geom_boxplot(outlier.size = 0.4, outlier.alpha = 0.3, linewidth = 0.35) +
-  scale_fill_manual(values = c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7"),
-                    name = "End type") +
+  scale_fill_manual(values = END_TYPE_COLORS_BRIGHT, name = "End type") +
   labs(
     title = "RT template switching by initiator dinucleotide",
     subtitle = "% alignments per TSS cluster × condition; sorted by median % 1Sg",
@@ -170,18 +173,15 @@ dev.off()
 # ── Figure 3: stacked bar — mean end-type fractions per initiator ─────────────
 message("  stacked bar: ", out_stack)
 
+pct_cols  <- end_type_cols("pct_")
 stack_dat <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg),
-                       .(mean_1Sg   = mean(pct_1Sg,   na.rm = TRUE),
-                         mean_2Sgg   = mean(pct_2Sgg,   na.rm = TRUE),
-                         mean_3Sggg = mean(pct_3Sggg, na.rm = TRUE),
-                         mean_M     = mean(pct_M,     na.rm = TRUE),
-                         mean_other = mean(pct_other, na.rm = TRUE)),
+                       lapply(.SD, mean, na.rm = TRUE), .SDcols = pct_cols,
                        by = initiator] |>
   as.data.frame() |>
-  pivot_longer(cols = starts_with("mean_"),
+  pivot_longer(cols = all_of(pct_cols),
                names_to = "end_type", values_to = "pct") |>
-  mutate(end_type = sub("mean_", "", end_type),
-         end_type = factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "M", "other")))
+  mutate(end_type = sub("^pct_", "", end_type),
+         end_type = factor(end_type, levels = END_TYPES))
 
 stack_dat$initiator <- factor(stack_dat$initiator, levels = init_order$initiator)
 
@@ -191,14 +191,11 @@ stack_n <- cond_mat[initiator %in% keep_init & !is.na(pct_1Sg), .N, by = initiat
   as.data.frame() |>
   mutate(initiator = factor(initiator, levels = init_order$initiator))
 
-type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585", "3Sggg" = "#7209b7",
-                 "M"   = "#06d6a0", "other" = "#adb5bd")
-
 p_stack <- ggplot(stack_dat, aes(x = initiator, y = pct, fill = end_type)) +
   geom_bar(stat = "identity", position = "stack", colour = "white", linewidth = 0.2) +
   geom_text(data = stack_n, aes(x = initiator, y = 101, label = fmt_n(N)),
             inherit.aes = FALSE, vjust = 0, size = 2.5, colour = "grey25") +
-  scale_fill_manual(values = type_colors, name = "End type") +
+  scale_fill_manual(values = END_TYPE_COLORS_BRIGHT, name = "End type") +
   scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 108)) +
   labs(
     title = "Mean 5′-end type composition by initiator",

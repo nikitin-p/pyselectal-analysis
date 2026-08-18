@@ -6,6 +6,12 @@
 star_index_hg38:    ""   # TODO: fill in after GENCODE genome is downloaded
 star_index_saccer3: "/home/pnikitin/cage/analysis_pyselectal_for_paper/star_index_saccer3"
 
+# ── Results tree ─────────────────────────────────────────────────────────────
+# Root beneath which every stage writes. Each dataset needs its own root: the
+# per-sample outputs are keyed by sample_id, but the aggregate tables and the
+# figures are not, so a shared root would let one run overwrite another in place.
+results_root: "results"
+
 # ── Paths ─────────────────────────────────────────────────────────────────────
 pyselectal: "pyselectal.py"          # path to pyselectal.py
 conda_env_star:       "star"         # conda env that has STAR
@@ -16,11 +22,15 @@ results_bam:           "results/bam"
 results_bam_sub:       "results/bam_subsampled"
 results_five_prime:    "results/five_prime"
 results_figures:       "results/figures"
+results_qc:            "results/qc"
 
 # ── STAR mapping ──────────────────────────────────────────────────────────────
 threads: 10
 mapq_threshold: 255         # keep only uniquely mapped reads
 star_extra_args: "--alignEndsType Local --outSAMattributes NH HI AS NM"
+# STAR --limitBAMsortRAM. This 3 GB value was chosen for sacCer3 on this VM, and
+# one sample (Nit_Rep2) required it; it is not transferable to a human genome.
+star_limit_bam_sort_ram: 3000000000
 
 # ── Subsampling ───────────────────────────────────────────────────────────────
 subsample_seed: 42
@@ -31,6 +41,12 @@ subsample_factor: 0.95             # target = floor(0.95 × min(retained depths)
 collapse_threshold: 0.1    # collapse categories below 0.1 % of total into 'other'
 mapped_prefix: 5           # bases of matched sequence to show for M-type ends
 
+# ── Stage 6: per-type BAM selection ──────────────────────────────────────────
+# The end-type vocabulary, mirroring scripts/utils/end_types.R for the one bash
+# consumer that cannot source R. Keep the two in the same order; the R file is
+# authoritative and test/run_end_types_test.sh checks that they agree.
+end_types: "1Sg 2Sgg 3Sggg 2Stg 1Sa 2Sga 1St 1Sc M"
+
 # ── Annotation BED files ─────────────────────────────────────────────────────
 # sacCer3: gene-level BED6 derived from data/sacCer3.ensGene.gtf by
 #          scripts/00_setup/make_yeast_gene_bed.sh. The name column holds the
@@ -40,6 +56,14 @@ mapped_prefix: 5           # bases of matched sequence to show for M-type ends
 # hg38:    will use GENCODE GTF/BED after annotation source is finalised
 annotation_bed_yeast: "data/sacCer3.genes.bed"
 annotation_bed_hg38:  ""   # TODO: fill in after hg38 GENCODE annotation decision
+
+# Generic, dataset-neutral aliases. The stage wrappers read these rather than the
+# genome-specific keys above, so that switching datasets is a change of params
+# file rather than a change of script.
+genome_fasta:   "data/sacCer3.fa"
+annotation_gtf: "data/sacCer3.ensGene.gtf"
+annotation_bed: "data/sacCer3.genes.bed"
+go_orgdb:       "org.Sc.sgd.db"
 
 # ── Stage 10: CAGEr ───────────────────────────────────────────────────────────
 results_cager:                "results/cager"
@@ -148,3 +172,15 @@ a8_seed:                 42
 a8_fdr:                  0.05    # Benjamini-Hochberg threshold
 a8_min_total:            5       # per-position pooled floor; MUST equal Stage 8's --min_total
 a8_max_dist:             20      # clustering distance; MUST equal Stage 8's --max_dist
+
+# ── Stage 19: origins of the exotic 5' end types ─────────────────────────────
+# "Exotic" here means every fine type other than 1Sg, so M is included: the
+# question is where the non-canonical signal comes from, and unclipped starts
+# are the largest non-canonical class by an order of magnitude. Dominance is
+# decided per CTSS position rather than per distclu cluster, so the depth floor
+# below leaves most positions uncallable by construction; that bucket is drawn
+# rather than dropped. Every statistical parameter is shared with Stage 17.
+results_exotic_origins:  "results/exotic_origins"
+exo_top_types:           12      # exotic types drawn individually; the rest pool into "other"
+exo_point_cap:           2000    # jittered points drawn per raincloud group
+exo_seed:                42      # seed for that thinning

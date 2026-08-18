@@ -46,7 +46,12 @@ if (!force && file.exists(f_q)) {
 }
 
 YR_RED  <- "#e63946"   # project convention for canonical initiators
-CANON   <- c("CA", "CG", "TA", "TG")
+BLUE    <- "#2166ac"   # the depleted end of the fill scale, reused for the labels
+PURPLE  <- "#7b2cbf"
+CANON   <- c("CA", "CG", "TA", "TG")          # the YR class
+RY      <- c("AC", "AT", "GC", "GT")          # purine followed by pyrimidine
+TCT     <- "TC"        # the first two bases of the polypyrimidine TCT initiator
+SG_RE   <- "^[0-9]+Sg" # the G-clipped end types: 1Sg, 2Sgg, 3Sggg
 
 res  <- fread(tests_f)
 prim <- res[config == "primary"]
@@ -59,10 +64,21 @@ bubble <- function(dt, order_col, decreasing, fname, subtitle) {
   d <- copy(dt)
   setorderv(d, order_col, if (decreasing) -1L else 1L)
   d[, label := factor(label, levels = rev(d$label))]
-  # Colour the y-axis label red when the initiator is canonical.
+  # The y-axis label carries the class of the pair, which the fill scale cannot,
+  # because the fill already encodes the effect size. A G-clipped end type on a
+  # canonical initiator takes the sign of its own association, so a canonical
+  # pair that runs the other way cannot be read as supporting the rule; the
+  # three classes are disjoint, so the order of the assignments below is a
+  # convenience and not a precedence.
+  d[, hl := "other"]
+  d[grepl(SG_RE, end_type) & dinuc %in% CANON,
+    hl := fifelse(log2fc >= 0, "sg_canon_pos", "sg_canon_neg")]
+  d[grepl(SG_RE, end_type) & dinuc == TCT, hl := "sg_tct"]
+  d[dinuc %in% RY, hl := "ry"]
+  pal  <- c(sg_canon_pos = YR_RED, sg_canon_neg = BLUE, sg_tct = PURPLE,
+            ry = BLUE, other = "grey20")
   lv   <- levels(d$label)
-  dn   <- sub("^.*\\|\\s*", "", lv)
-  cols <- ifelse(dn %in% CANON, YR_RED, "grey20")
+  cols <- unname(pal[d$hl[match(lv, d$label)]])
 
   p <- ggplot(d, aes(x = neg_log10_q, y = label)) +
     geom_vline(xintercept = -log10(fdr), linetype = "dotted", colour = "grey50") +
@@ -87,8 +103,11 @@ bubble <- function(dt, order_col, decreasing, fname, subtitle) {
 bubble(prim, "neg_log10_q", TRUE, "19_a8_bubble_by_q.pdf",
        paste0("position-weighted, background ", min(bg_plat), "..", max(bg_plat),
               ", membership >= ", min_reads, " alignments; ",
-              "red = enriched, blue = depleted; ",
-              "thick outline = bootstrap CI excludes 0"))
+              "fill: red = enriched, blue = depleted; ",
+              "thick outline = bootstrap CI excludes 0\n",
+              "labels: red = G-clip on a canonical (YR) initiator, blue if that ",
+              "association is negative; purple = G-clip on TC (TCT motif); ",
+              "blue = any RY initiator"))
 bubble(prim, "log2fc", TRUE, "19_a8_bubble_by_fc.pdf",
        paste("same data ordered by log2FC, which separates the enriched and",
              "depleted ends of the spectrum"))

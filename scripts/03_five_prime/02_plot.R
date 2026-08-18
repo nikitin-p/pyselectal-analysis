@@ -50,25 +50,43 @@ source(if (length(.f))
          file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "plot_helpers.R")
        else "scripts/utils/plot_helpers.R")
 
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d rather than run directly, commandArgs(FALSE)
+# reflects the OUTER script's --file, not this file's own path, so the path
+# above can resolve to the wrong directory depth. Fall back to the
+# project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # Category labels follow the current pyselectal selector syntax, in which the
 # soft-clip length is implied by the pattern itself (Sg = 1Sg, Sgg = 2Sgg,
-# Sggg = 3Sggg). The `--count` output still prints the explicit length prefix,
-# so the raw type strings are matched with the numeric form and relabelled here.
+# Sggg = 3Sggg, Stg = 2Stg, Sga = 2Sga). The `--count` output still prints the
+# explicit length prefix, so the raw type strings are matched with the numeric
+# form and relabelled here. The labels are literal clip sequences written
+# 5' -> 3': "Sgg" means the two clipped bases are exactly "GG", not "first
+# base is G", so the match against the raw type must be exact rather than a
+# prefix match.
 classify_type <- function(type) {
   # Sg                 → soft-clip length 1, base G
   # Sgg                → soft-clip length 2, both bases G
   # Sggg               → soft-clip length 3, all G
+  # Stg                → soft-clip length 2, bases T then G
+  # Sga                → soft-clip length 2, bases G then A
   # M                  → mapped 5' end (no soft-clip), e.g. 36Mctcac
   # other_soft_clipped → pyselectal collapsed rare soft-clipped types
   # other_mapped       → pyselectal collapsed rare mapped types
   dplyr::case_when(
-    type == "1Sg"                            ~ "Sg",
-    grepl("^2Sgg", type, ignore.case = TRUE) ~ "Sgg",
-    type == "3Sggg"                          ~ "Sggg",
-    grepl("^[0-9]+M", type)                  ~ "M",
-    grepl("^other_soft_clipped", type)       ~ "other_soft_clipped",
-    grepl("^other_mapped", type)             ~ "other_mapped",
-    TRUE                                     ~ "other_soft_clipped"
+    type == "1Sg"                      ~ "Sg",
+    type == "2Sgg"                     ~ "Sgg",
+    type == "3Sggg"                    ~ "Sggg",
+    type == "2Stg"                     ~ "Stg",
+    type == "2Sga"                     ~ "Sga",
+    grepl("^[0-9]+M", type)            ~ "M",
+    grepl("^other_soft_clipped", type) ~ "other_soft_clipped",
+    grepl("^other_mapped", type)       ~ "other_mapped",
+    TRUE                               ~ "other_soft_clipped"
   )
 }
 
@@ -114,12 +132,15 @@ sample_labels <- setNames(counts_agg$sample_label, counts_agg$sample_id)
 sample_labels <- sample_labels[!duplicated(names(sample_labels))]
 
 # Fixed display order: the G-appending series first, then everything else.
-cat_levels <- c("Sg", "Sgg", "Sggg", "other_soft_clipped", "M", "other_mapped")
+cat_levels <- c("Sg", "Sgg", "Sggg", "Stg", "Sga",
+                "other_soft_clipped", "M", "other_mapped")
 counts_agg$category <- factor(counts_agg$category, levels = cat_levels)
 
 cat_colours <- c("Sg"                 = "#E64B35",
                  "Sgg"                = "#F39B7F",
                  "Sggg"               = "#FCBBA1",
+                 "Stg"                = unname(END_TYPE_COLORS_BRIGHT["2Stg"]),
+                 "Sga"                = unname(END_TYPE_COLORS_BRIGHT["2Sga"]),
                  "other_soft_clipped" = "#B2B2B2",
                  "M"                  = "#4DBBD5",
                  "other_mapped"       = "#7F7F7F")

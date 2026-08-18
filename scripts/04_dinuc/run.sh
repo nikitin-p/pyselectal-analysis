@@ -11,9 +11,9 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 source "$ROOT_DIR/scripts/utils/log.sh"
 source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 
-BAM_DIR="$ROOT_DIR/results/bam_subsampled"
+BAM_DIR=""
 SAMPLES="$ROOT_DIR/config/samples.tsv"
-OUTDIR="$ROOT_DIR/results/dinuc"
+OUTDIR=""
 PARAMS="$ROOT_DIR/config/params.yaml"
 EXTRA_ARGS=()
 
@@ -27,6 +27,12 @@ while [[ $# -gt 0 ]]; do
         *) die "Unknown argument: $1" ;;
     esac
 done
+
+# Defaults are resolved after argument parsing, so that they follow whichever
+# params file was selected rather than the yeast tree.
+RESULTS_ROOT="$(resolve_results_root "$PARAMS" "$ROOT_DIR")"
+[[ -z "$BAM_DIR" ]] && BAM_DIR="$RESULTS_ROOT/bam_subsampled"
+[[ -z "$OUTDIR"  ]] && OUTDIR="$RESULTS_ROOT/dinuc"
 
 CONDA_R="$(yaml_get conda_env_r "$PARAMS")"
 RSCRIPT=$(conda run -n "$CONDA_R" which Rscript)

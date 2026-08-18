@@ -14,8 +14,8 @@
 #       [--figdir     results/figures]            \
 #       [--min_reads  10]                         \
 #       [--top_pct    10]                         \
-#       [--upstream   50]                         \
-#       [--downstream 10]                         \
+#       [--upstream   15]                         \
+#       [--downstream 15]                         \
 #       [--force]
 
 suppressPackageStartupMessages({
@@ -30,6 +30,13 @@ suppressPackageStartupMessages({
   library(readr)
   library(yaml)
 })
+
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -74,8 +81,8 @@ outdir     <- get_arg("--outdir",     "results/motifs")
 figdir     <- get_arg("--figdir",     "results/figures")
 min_reads  <- as.integer(get_arg("--min_reads", "10"))
 top_pct    <- as.numeric(get_arg("--top_pct", "10"))
-upstream   <- as.integer(get_arg("--upstream", "50"))
-downstream <- as.integer(get_arg("--downstream", "10"))
+upstream   <- as.integer(get_arg("--upstream", "15"))
+downstream <- as.integer(get_arg("--downstream", "15"))
 force      <- has_flag("--force")
 
 validate_args()
@@ -168,9 +175,8 @@ tss <- fread(tss_f)
 message("  rows: ", nrow(tss), " (", uniqueN(tss$cluster_id), " clusters)")
 
 # Detect available end types from column names
-all_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M", "other")
-avail_n_cols <- paste0("n_", all_types)
-avail_types <- all_types[avail_n_cols %in% colnames(tss)]
+avail_n_cols <- end_type_cols("n_", END_TYPES)
+avail_types  <- END_TYPES[avail_n_cols %in% colnames(tss)]
 message("  available end types: ", paste(avail_types, collapse = ", "))
 
 # ── aggregate across samples ──────────────────────────────────────────────────
@@ -344,10 +350,7 @@ for (typ in names(pwms)) {
 freq_all <- bind_rows(freq_list)
 freq_all$type <- factor(freq_all$type, levels = names(pwms))
 
-type_colors <- c(
-  "1Sg" = "#1f77b4", "2Sgg" = "#ff7f0e", "3Sggg" = "#2ca02c",
-  "1Sa" = "#d62728", "1St" = "#9467bd", "1Sc" = "#8c564b", "M" = "#7f7f7f"
-)
+type_colors <- END_TYPE_COLORS_TAB10
 
 p_freq <- ggplot(freq_all, aes(x = position, y = freq, color = type)) +
   geom_line(linewidth = 0.5, alpha = 0.8) +

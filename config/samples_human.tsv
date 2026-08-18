@@ -1,0 +1,26 @@
+sample_id	dataset	genome	condition	replicate	subcellular	fastq	bam
+# LUHMES differentiation time course, three time points and three replicates,
+# each assayed by both CAGE (total RNA) and NET-CAGE (chromatin-associated RNA).
+# The genome column holds the GRCh38 FASTA the STAR index was built from; the bam column
+# is the subsampled BAM that stages 3 and onward read, and it is produced by
+# stages 1-2 rather than supplied.
+# ----- LUHMES CAGE (total) -----
+luhmes_cage_d1_r1	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	1	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep1CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d1_r1_sub.bam
+luhmes_cage_d1_r2	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	2	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep2CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d1_r2_sub.bam
+luhmes_cage_d1_r3	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	3	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep3CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d1_r3_sub.bam
+luhmes_cage_d3_r1	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	1	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep1CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d3_r1_sub.bam
+luhmes_cage_d3_r2	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	2	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep2CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d3_r2_sub.bam
+luhmes_cage_d3_r3	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	3	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep3CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d3_r3_sub.bam
+luhmes_cage_d6_r1	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	1	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep1CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d6_r1_sub.bam
+luhmes_cage_d6_r2	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	2	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep2CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d6_r2_sub.bam
+luhmes_cage_d6_r3	luhmes_cage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	3	total	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep3CAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_cage_d6_r3_sub.bam
+# ----- LUHMES NET-CAGE (chromatin-associated) -----
+luhmes_netcage_d1_r1	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	1	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep1NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d1_r1_sub.bam
+luhmes_netcage_d1_r2	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	2	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep2NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d1_r2_sub.bam
+luhmes_netcage_d1_r3	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day1	3	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay1Rep3NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d1_r3_sub.bam
+luhmes_netcage_d3_r1	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	1	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep1NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d3_r1_sub.bam
+luhmes_netcage_d3_r2	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	2	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep2NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d3_r2_sub.bam
+luhmes_netcage_d3_r3	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day3	3	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay3Rep3NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d3_r3_sub.bam
+luhmes_netcage_d6_r1	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	1	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep1NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d6_r1_sub.bam
+luhmes_netcage_d6_r2	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	2	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep2NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d6_r2_sub.bam
+luhmes_netcage_d6_r3	luhmes_netcage	/home/pnikitin/cage/hg38/GRCh38.primary_assembly.genome.fa	day6	3	chromatin	/home/pnikitin/cage/data_net_cage/neuro_raw/luhmesDay6Rep3NETCAGE_L001_R1_001.fastq.gz	results_human/bam_subsampled/luhmes_netcage_d6_r3_sub.bam

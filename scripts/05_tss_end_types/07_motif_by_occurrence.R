@@ -13,8 +13,8 @@
 #       [--outdir   results/motifs]                \
 #       [--figdir   results/figures]               \
 #       [--max_pos  5000]                          \
-#       [--upstream 20]                            \
-#       [--downstream 20]                          \
+#       [--upstream 15]                            \
+#       [--downstream 15]                          \
 #       [--promoter_only]                          \
 #       [--yr_only]                                \
 #       [--force]
@@ -31,6 +31,13 @@ suppressPackageStartupMessages({
   library(readr)
   library(yaml)
 })
+
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -74,8 +81,8 @@ gtf_f        <- get_arg("--gtf",        "data/sacCer3.ensGene.gtf")
 outdir       <- get_arg("--outdir",     "results/motifs")
 figdir       <- get_arg("--figdir",     "results/figures")
 max_pos      <- as.integer(get_arg("--max_pos", "5000"))
-upstream     <- as.integer(get_arg("--upstream", "20"))
-downstream   <- as.integer(get_arg("--downstream", "20"))
+upstream     <- as.integer(get_arg("--upstream", "15"))
+downstream   <- as.integer(get_arg("--downstream", "15"))
 promoter_only <- has_flag("--promoter_only")
 yr_only       <- has_flag("--yr_only")
 force         <- has_flag("--force")
@@ -290,7 +297,7 @@ logo_data <- lapply(type_seqs, function(s) as.character(s))
 pos_labels <- seq(-upstream, downstream)
 
 # Order types logically
-type_order <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M")
+type_order <- END_TYPES_REAL
 type_order <- intersect(type_order, names(logo_data))
 logo_data <- logo_data[type_order]
 pwms <- pwms[type_order]
@@ -378,10 +385,7 @@ for (typ in names(pwms)) {
 freq_all <- bind_rows(freq_list)
 freq_all$type <- factor(freq_all$type, levels = type_order)
 
-type_colors <- c(
-  "1Sg" = "#1f77b4", "2Sgg" = "#ff7f0e", "3Sggg" = "#2ca02c",
-  "1Sa" = "#d62728", "1St" = "#9467bd", "1Sc" = "#8c564b", "M" = "#7f7f7f"
-)
+type_colors <- END_TYPE_COLORS_TAB10
 
 p_freq <- ggplot(freq_all, aes(x = position, y = freq, color = type)) +
   geom_line(linewidth = 0.6, alpha = 0.8) +
