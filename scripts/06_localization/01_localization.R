@@ -35,6 +35,18 @@ suppressPackageStartupMessages({
 
 args <- commandArgs(trailingOnly = TRUE)
 
+# The 5' end-type vocabulary is sourced, not hardcoded — see scripts/utils/end_types.R.
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d rather than run directly, commandArgs(FALSE)
+# reflects the OUTER script's --file, not this file's own path, so the path
+# above can resolve to the wrong directory depth. Fall back to the
+# project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 get_arg <- function(flag, default = NULL) {
   i <- which(args == flag)
   if (length(i) == 0) return(default)
@@ -335,7 +347,7 @@ if (!fast_mode) {
 # ── Process all samples ───────────────────────────────────────────────────────
 message("\nProcessing samples...")
 
-end_types <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M")
+end_types <- END_TYPES_REAL
 results_list <- list()
 
 for (i in seq_len(nrow(samples))) {
@@ -415,7 +427,7 @@ ref_reads <- summary_dt[end_type == "1Sg", .(category, total_reads)]
 ref_prop <- setNames(ref_reads$total_reads / sum(ref_reads$total_reads), ref_reads$category)
 
 chisq_results <- list()
-for (et in intersect(c("2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"), unique(summary_dt$end_type))) {
+for (et in intersect(setdiff(END_TYPES_REAL, "1Sg"), unique(summary_dt$end_type))) {
   obs <- summary_dt[end_type == et, .(category, total_reads)]
   common <- intersect(names(ref_prop), obs$category)
   if (length(common) < 2) next
@@ -458,7 +470,7 @@ plot_dt <- melt(summary_dt, id.vars = c("end_type", "category"),
                 variable.name = "level", value.name = "pct")
 plot_dt[, level := gsub("pct_", "", level)]
 plot_dt[, category := factor(category, levels = cat_order)]
-plot_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"))]
+plot_dt[, end_type := factor(end_type, levels = END_TYPES_REAL)]
 
 # Totals behind each 100% bar: reads in the left facet, unique positions in the right.
 bar_n <- rbind(
@@ -493,7 +505,7 @@ enrich_wide <- dcast(enrich_dt, end_type ~ category, value.var = "log2_enrich")
 enrich_mat <- as.matrix(enrich_wide[, -1, with = FALSE])
 rownames(enrich_mat) <- enrich_wide$end_type
 
-avail_types <- intersect(c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"), rownames(enrich_mat))
+avail_types <- intersect(END_TYPES_REAL, rownames(enrich_mat))
 avail_cats <- intersect(cat_order, colnames(enrich_mat))
 enrich_mat <- enrich_mat[avail_types, avail_cats, drop = FALSE]
 
@@ -511,7 +523,7 @@ message("  written: 10_localization_enrichment.pdf")
 sample_dt <- results_dt[, .(category, pct = 100 * n_reads / sum(n_reads)),
                         by = .(sample_id, end_type)]
 sample_dt[, category := factor(category, levels = cat_order)]
-sample_dt[, end_type := factor(end_type, levels = c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M"))]
+sample_dt[, end_type := factor(end_type, levels = END_TYPES_REAL)]
 
 sample_n <- results_dt[, .(n = sum(n_reads)), by = .(sample_id, end_type)]
 sample_n[, end_type := factor(end_type, levels = levels(sample_dt$end_type))]
