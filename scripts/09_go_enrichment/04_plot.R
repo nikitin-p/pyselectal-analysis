@@ -15,6 +15,13 @@ suppressMessages({
     library(ggplot2)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 CANON     <- "#e63946"                    # canonical (YR) initiator colour, reserved project-wide
 HIGHLIGHT_COLOR <- "#2a9d8f"               # AA/AG highlight; distinct from CANON, not a claim of canonicity
 YR        <- c("CA", "CG", "TA", "TG")
@@ -126,14 +133,13 @@ plot_family <- function(family, res_path, dot_path, mat_path,
     message("Wrote ", mat_path)
 }
 
-END_TYPES <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M")
 DINUCS <- as.vector(t(outer(c("A", "C", "G", "T"), c("A", "C", "G", "T"), paste0)))
 
 plot_family("end type",
             file.path(opt$outdir, "go_endtype.tsv"),
             file.path(opt$figdir, "17_go_endtype_dotplot.pdf"),
             file.path(opt$figdir, "17_go_endtype_matrix.pdf"),
-            END_TYPES, character(0), character(0))
+            END_TYPES_REAL, character(0), character(0))
 
 plot_family("initiator",
             file.path(opt$outdir, "go_initiator.tsv"),

@@ -13,6 +13,13 @@ suppressMessages({
     library(Rsamtools)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 opt <- parse_args(OptionParser(option_list = list(
     make_option("--tss",        type = "character"),
     make_option("--genome",     type = "character"),
@@ -40,7 +47,7 @@ tss <- tss[tss$mean_total >= opt$min_total, ]
 message(sprintf("After mean_total >= %s: %d", opt$min_total, nrow(tss)))
 
 # ---- dominant end type per TSS --------------------------------------------
-pct_cols <- c("mean_pct_1Sg", "mean_pct_2Sgg", "mean_pct_3Sggg", "mean_pct_M")
+pct_cols <- end_type_cols("mean_pct_", END_TYPES_REAL)
 pct_mat  <- as.matrix(tss[, pct_cols])
 tss$end_type <- sub("^mean_pct_", "", pct_cols[max.col(pct_mat, ties.method = "first")])
 tss$end_type_purity <- round(apply(pct_mat, 1, max), 2)

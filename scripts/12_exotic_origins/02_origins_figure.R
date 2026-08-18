@@ -137,6 +137,8 @@ fwrite(expr[, .(position_id, origin, total_depth, exotic_depth)],
 
 ORIGIN_COLS <- c(Sg_dom       = "#1f78b4",
                  Sgg_dom      = "#33a02c",
+                 Stg_dom      = "#6a3d9a",
+                 Sga_dom      = "#b15928",
                  other_called = "#ff7f00",
                  not_callable = "#bdbdbd")
 present <- ORIGIN_LEVELS[ORIGIN_LEVELS %in% as.character(omap$origin)]
@@ -161,7 +163,7 @@ pA <- ggplot(tal, aes(measure_lab, count, fill = origin)) +
                      breaks = c(0, 0.25, 0.5, 0.75, 1)) +
   coord_cartesian(ylim = c(0, 1.3)) +
   scale_fill_manual(values = ORIGIN_COLS, breaks = present,
-                    labels = ORIGIN_LABELS) +
+                    labels = ORIGIN_LABELS[present]) +
   labs(x = NULL, y = "share of the bar",
        fill = "origin of the position",
        title = "A  Where the exotic 5' end types come from",

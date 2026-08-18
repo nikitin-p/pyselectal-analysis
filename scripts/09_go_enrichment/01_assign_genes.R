@@ -22,6 +22,13 @@ suppressMessages({
     library(GenomicRanges)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 opt <- parse_args(OptionParser(option_list = list(
     make_option("--tss_matrix",    type = "character"),
     make_option("--tss_clustered", type = "character"),
@@ -33,7 +40,7 @@ opt <- parse_args(OptionParser(option_list = list(
     make_option("--force",         action = "store_true", default = FALSE)
 )))
 
-TYPES <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M", "other")
+TYPES <- END_TYPES
 
 dir.create(opt$outdir, recursive = TRUE, showWarnings = FALSE)
 assign_out <- file.path(opt$outdir, "tss_gene_assignment.tsv")

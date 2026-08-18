@@ -7,7 +7,7 @@
 # is an independent result rather than a circular one.
 #
 # Usage:
-#   bash scripts/08_seqarchr/run.sh [--force]
+#   bash scripts/08_seqarchr/run.sh [--force] [--recollate]
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,11 +18,13 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
+RECOLLATE_FLAG=""
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --params)  PARAMS="$2";  shift 2 ;;
-        --samples) SAMPLES="$2"; shift 2 ;;
-        --force)   FORCE_FLAG="--force"; shift ;;
+        --params)    PARAMS="$2";  shift 2 ;;
+        --samples)   SAMPLES="$2"; shift 2 ;;
+        --force)     FORCE_FLAG="--force"; shift ;;
+        --recollate) RECOLLATE_FLAG="--recollate"; shift ;;
         *) die "Unknown argument: $1" ;;
     esac
 done
@@ -84,7 +86,7 @@ $RSCRIPT "$SCRIPT_DIR/02_run_seqarchr.R" \
     --n_cores    "$N_CORES" \
     --n_arch     "$N_ARCH" \
     --seed       "$SEED" \
-    $FORCE_FLAG
+    $FORCE_FLAG $RECOLLATE_FLAG
 
 log_info "Stage 08 step 3: architecture vs end-type analysis"
 $RSCRIPT "$SCRIPT_DIR/03_analyze_clusters.R" \

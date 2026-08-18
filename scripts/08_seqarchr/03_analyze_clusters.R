@@ -21,6 +21,13 @@ suppressMessages({
     library(ggseqlogo)
 })
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 opt <- parse_args(OptionParser(option_list = list(
     make_option("--outdir",     type = "character"),
     make_option("--figdir",     type = "character"),
@@ -101,8 +108,7 @@ print(
     ggplot(prop_df, aes(arch_cluster, pct, fill = end_type)) +
         geom_col() +
         geom_hline(yintercept = 100 * global_m, linetype = "dashed", colour = "grey20") +
-        scale_fill_manual(values = c("1Sg" = CANON, "2Sgg" = "#f4a261",
-                                     "3Sggg" = "#e9c46a", "M" = "#457b9d")) +
+        scale_fill_manual(values = END_TYPE_COLORS_BRIGHT) +
         labs(x = "seqArchR architecture", y = "% of TSSs",
              fill = "Dominant end type",
              title = "End-type composition of de novo sequence architectures",

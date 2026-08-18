@@ -11,28 +11,40 @@
 
 # ── origin classes ────────────────────────────────────────────────────────────
 
-# Drawing order, from the canonical class to the undecidable one.
-ORIGIN_LEVELS <- c("Sg_dom", "Sgg_dom", "other_called", "not_callable")
+# Drawing order, from the canonical class to the undecidable one. 2Stg and 2Sga
+# each carry as much signal as 2Sgg, so each earns its own origin rather than
+# vanishing into the pooled class.
+ORIGIN_LEVELS <- c("Sg_dom", "Sgg_dom", "Stg_dom", "Sga_dom",
+                   "other_called", "not_callable")
 
 # Human-readable labels for the figure legend.
 ORIGIN_LABELS <- c(
   Sg_dom       = "1Sg-dominated",
   Sgg_dom      = "2Sgg-dominated",
+  Stg_dom      = "2Stg-dominated",
+  Sga_dom      = "2Sga-dominated",
   other_called = "callable, other or no dominant type",
   not_callable = "below the depth floor"
 )
 
-# Assign each row of a position-level dominance table to one of the four
+# Maps a dominant fine type to its origin level. Types absent from this map fall
+# through to "other_called", which is what keeps the figure legible.
+ORIGIN_BY_TYPE <- c("1Sg" = "Sg_dom", "2Sgg" = "Sgg_dom",
+                    "2Stg" = "Stg_dom", "2Sga" = "Sga_dom")
+
+# Assign each row of a position-level dominance table to one of the six
 # origins. `dom` must carry dom_type, pass_depth and dominated, which is what
-# call_dominance() returns. A position that failed the depth filter is never
-# callable, and `dominated` already implies pass_depth, so the three assignments
-# below cannot overlap.
-classify_origin <- function(dom, sg_type = "1Sg", sgg_type = "2Sgg") {
+# call_dominance() returns. not_callable is assigned LAST, so that a position
+# that failed the depth filter can never be overwritten by a dominated row;
+# `dominated` already implies pass_depth in the well-formed case, but this
+# ordering guarantees the depth floor wins even if that invariant is violated.
+classify_origin <- function(dom, origin_by_type = ORIGIN_BY_TYPE) {
   stopifnot(all(c("dom_type", "pass_depth", "dominated") %in% names(dom)))
   cls <- rep("other_called", nrow(dom))
+  mapped <- origin_by_type[dom$dom_type]
+  hit <- dom$dominated & !is.na(mapped)
+  cls[hit] <- mapped[hit]
   cls[!dom$pass_depth] <- "not_callable"
-  cls[dom$dominated & dom$dom_type == sg_type]  <- "Sg_dom"
-  cls[dom$dominated & dom$dom_type == sgg_type] <- "Sgg_dom"
   factor(cls, levels = ORIGIN_LEVELS)
 }
 

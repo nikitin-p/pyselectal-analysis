@@ -19,7 +19,12 @@
 
 suppressMessages(library(optparse))
 
-END_TYPES <- c("1Sg", "2Sgg", "3Sggg", "1Sa", "1St", "1Sc", "M")
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
 
 # a              : the assignment table
 # types          : end types to build sets for
@@ -96,7 +101,7 @@ main <- function() {
                     nrow(a), length(universe)))
 
     message("Building foreground sets:")
-    sets <- build_endtype_sets(a, END_TYPES, opt$quantile, opt$min_type_reads)
+    sets <- build_endtype_sets(a, END_TYPES_REAL, opt$quantile, opt$min_type_reads)
 
     message("Running enrichment:")
     res <- run_enrichment(sets, universe, family = "endtype",

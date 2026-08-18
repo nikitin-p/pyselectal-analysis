@@ -29,6 +29,16 @@ suppressPackageStartupMessages({
   library(yaml)
 })
 
+# The shared end-type vocabulary (END_TYPES, END_TYPE_COLORS_BRIGHT). Figure 2
+# below was hardcoded to the original four-category scheme (1Sg/2Sgg/M/other)
+# from before 2Sga and 2Stg were promoted out of "other"; it now iterates
+# END_TYPES so it does not silently drop the six fine types tss_clustered.tsv
+# carries today.
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+source(if (length(.f))
+         file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+       else "scripts/utils/end_types.R")
+
 # ── helpers ───────────────────────────────────────────────────────────────────
 `%||%` <- function(x, y) if (!is.null(x) && length(x) > 0 && !is.na(x[[1]]) && x[[1]] != "") x else y
 
@@ -79,10 +89,11 @@ clus <- fread(clust_f)
 meta <- read_tsv(samples_f, comment = "#", col_types = cols(.default = "c"),
                  show_col_types = FALSE)
 
-# Cluster-level mean end-type fractions (from stage 9 tss_clustered.tsv)
-clus_feat <- clus[, .(cluster_id, chr, tss_pos, strand, initiator,
-                       hclust_group, annotation,
-                       mean_pct_1Sg, mean_pct_2Sgg, mean_pct_M, mean_pct_other)]
+# Cluster-level mean end-type fractions (from stage 9 tss_clustered.tsv), over
+# the full END_TYPES vocabulary rather than a fixed four-column subset.
+mean_pct_cols <- end_type_cols("mean_pct_", END_TYPES)
+clus_feat <- clus[, c("cluster_id", "chr", "tss_pos", "strand", "initiator",
+                       "hclust_group", "annotation", mean_pct_cols), with = FALSE]
 
 # ── classify clusters ─────────────────────────────────────────────────────────
 clus_feat[, cluster_class := ifelse(
@@ -115,14 +126,13 @@ mat_ann <- mat_ann[!is.na(cluster_class)]
 
 # ── condition-level aggregation ───────────────────────────────────────────────
 # Samples subsampled to equal depth → use raw counts directly.
-# Average replicates within condition.
-cond_agg <- mat_ann[, .(
-  mean_n_total = mean(n_total, na.rm = TRUE),
-  mean_pct_1Sg = mean(pct_1Sg, na.rm = TRUE),
-  mean_pct_2Sgg = mean(pct_2Sgg, na.rm = TRUE),
-  mean_pct_M   = mean(pct_M,   na.rm = TRUE),
-  mean_pct_other = mean(pct_other, na.rm = TRUE)
-), by = .(cluster_id, condition, cluster_class)]
+# Average replicates within condition, over the full END_TYPES vocabulary.
+pct_cols <- end_type_cols("pct_", END_TYPES)
+cond_agg <- mat_ann[, c(list(mean_n_total = mean(n_total, na.rm = TRUE)),
+                        lapply(.SD, mean, na.rm = TRUE)),
+                    .SDcols = pct_cols,
+                    by = .(cluster_id, condition, cluster_class)]
+setnames(cond_agg, pct_cols, mean_pct_cols)
 
 # ── Figure 1: expression (n_total) by condition, split by cluster class ───────
 message("  expression by condition: ", out_expr)
@@ -164,20 +174,14 @@ message("  end-type by condition: ", out_type)
 high_cond <- cond_agg[cluster_class != "other"] |>
   as.data.frame() |>
   pivot_longer(
-    cols      = c(mean_pct_1Sg, mean_pct_2Sgg, mean_pct_M, mean_pct_other),
+    cols      = all_of(mean_pct_cols),
     names_to  = "end_type",
     values_to = "pct"
   ) |>
-  mutate(end_type = recode(end_type,
-    mean_pct_1Sg   = "1Sg",
-    mean_pct_2Sgg   = "2Sgg",
-    mean_pct_M     = "M",
-    mean_pct_other = "other"
-  )) |>
-  mutate(end_type = factor(end_type, levels = c("1Sg", "2Sgg", "M", "other")))
+  mutate(end_type = sub("^mean_pct_", "", end_type)) |>
+  mutate(end_type = factor(end_type, levels = END_TYPES))
 
-type_colors <- c("1Sg" = "#4361ee", "2Sgg" = "#f72585",
-                 "M"   = "#06d6a0", "other" = "#adb5bd")
+type_colors <- END_TYPE_COLORS_BRIGHT
 
 p_type <- ggplot(high_cond, aes(x = condition, y = pct, fill = end_type)) +
   geom_boxplot(outlier.size = 0.4, outlier.alpha = 0.4, linewidth = 0.35,

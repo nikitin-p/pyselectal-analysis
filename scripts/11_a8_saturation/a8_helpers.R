@@ -3,20 +3,34 @@
 # and the cluster bootstrap. Sourced by 01_build_windows.R, 02_a8_test.R and
 # 03_plot.R, and unit-tested by test/a8/test_helpers.R.
 
+.f <- grep("^--file=", commandArgs(FALSE), value = TRUE)
+.end_types_path <- (if (length(.f))
+  file.path(dirname(sub("^--file=", "", .f[1])), "..", "utils", "end_types.R")
+else "scripts/utils/end_types.R")
+# When this script is source()d (e.g. by test/a8/test_helpers.R) rather than
+# run directly, commandArgs(FALSE) reflects the OUTER script's --file, not
+# this file's own path, so the path above can resolve to the wrong directory
+# depth. Fall back to the project-root-relative path in that case.
+if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
+source(.end_types_path)
+
 # ── the pair universe ─────────────────────────────────────────────────────────
-A8_TYPES  <- c("1Sa", "1Sc", "1Sg", "1St", "2Sgg", "3Sggg", "M")
+A8_TYPES  <- sort(END_TYPES_REAL)
 A8_BASES  <- c("A", "C", "G", "T")
 A8_DINUCS <- as.vector(t(outer(A8_BASES, A8_BASES, paste0)))
 
-# The 5' clip base each type implies. Under STAR --alignEndsType Local a read is
+# The 5' clip base each type implies is END_TYPE_CLIP_BASE from
+# scripts/utils/end_types.R: the LAST character of the label, since a fine-type
+# label is written in the read's original 5'->3' orientation and the base
+# abutting the alignment is therefore the label's 3'-most character (e.g. 2Sga
+# abuts with A, 2Stg abuts with G). Under STAR --alignEndsType Local a read is
 # only clipped when the genomic base at -1 differs from the clip base, so a
-# clipped type can never occur on a dinucleotide starting with its own base.
-# M carries no clip and is therefore unconstrained.
-A8_CLIP_BASE <- c("1Sa" = "A", "1Sc" = "C", "1Sg" = "G", "1St" = "T",
-                  "2Sgg" = "G", "3Sggg" = "G", "M" = NA_character_)
-
+# clipped type can never occur on a dinucleotide starting with its own abutting
+# base. M carries no clip and is therefore unconstrained. This was verified
+# empirically against real alignments; see the comment above
+# END_TYPE_CLIP_BASE in scripts/utils/end_types.R for the read counts.
 is_structurally_empty <- function(type, dinuc) {
-  cb <- A8_CLIP_BASE[type]
+  cb <- END_TYPE_CLIP_BASE[type]
   !is.na(cb) & substr(dinuc, 1L, 1L) == cb
 }
 
