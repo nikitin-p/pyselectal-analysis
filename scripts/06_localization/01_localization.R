@@ -77,11 +77,12 @@ params  <- yaml.load_file(params_f)
 samples <- read_tsv(samples_f, show_col_types = FALSE) %>%
   filter(!grepl("^#", sample_id))
 
-PROMOTER_UP <- 1000L
-PROMOTER_DOWN <- 100L
-TSS_REGION <- c(-PROMOTER_UP, PROMOTER_DOWN)
+# The promoter window, the ChIPseeker batch size, the category order, the
+# palette and both annotation functions are shared with Stage 19 step 4 —
+# see scripts/utils/localization.R.
+source(file.path(dirname(.end_types_path), "localization.R"))
+
 BALANCE_THRESHOLD <- 0.95
-BATCH_SIZE <- 200000L
 
 # ── Load annotation-related packages ──────────────────────────────────────────
 if (!fast_mode) {
@@ -109,73 +110,6 @@ if (fast_mode) {
   intron_gr <- unlist(intronsByTranscript(txdb))
   message("  promoters: ", length(promoter_gr), ", 5'UTR: ", length(utr5_gr),
           ", 3'UTR: ", length(utr3_gr), ", CDS: ", length(cds_gr), ", introns: ", length(intron_gr))
-}
-
-# ── Annotation functions ──────────────────────────────────────────────────────
-
-# Fast mode: direct TxDb-based annotation
-annotate_positions_fast <- function(pos_gr, promoter_gr, utr5_gr, utr3_gr, cds_gr, intron_gr) {
-  n <- length(pos_gr)
-  if (n == 0) return(character(0))
-
-  category <- rep("Intergenic", n)
-
-  if (length(intron_gr) > 0) {
-    hits <- findOverlaps(pos_gr, intron_gr, ignore.strand = FALSE)
-    category[queryHits(hits)] <- "Intron"
-  }
-  if (length(cds_gr) > 0) {
-    hits <- findOverlaps(pos_gr, cds_gr, ignore.strand = FALSE)
-    category[queryHits(hits)] <- "CDS"
-  }
-  if (length(utr3_gr) > 0) {
-    hits <- findOverlaps(pos_gr, utr3_gr, ignore.strand = FALSE)
-    category[queryHits(hits)] <- "3' UTR"
-  }
-  if (length(utr5_gr) > 0) {
-    hits <- findOverlaps(pos_gr, utr5_gr, ignore.strand = FALSE)
-    category[queryHits(hits)] <- "5' UTR"
-  }
-  hits <- findOverlaps(pos_gr, promoter_gr, ignore.strand = FALSE)
-  category[queryHits(hits)] <- "Promoter"
-
-  category
-}
-
-# Full mode: ChIPseeker annotation (batched for memory)
-annotate_positions_chipseeker <- function(pos_gr, txdb, enhancer_gr = GRanges(),
-                                          tssRegion = TSS_REGION, batch_size = BATCH_SIZE) {
-  n <- length(pos_gr)
-  if (n == 0) return(character(0))
-
-  if (n <= batch_size) {
-    anno <- annotatePeak(pos_gr, TxDb = txdb, tssRegion = tssRegion,
-                         level = "transcript", annoDb = NULL, verbose = FALSE)
-    category <- as.data.frame(anno)$annotation
-  } else {
-    n_batches <- ceiling(n / batch_size)
-    category <- character(n)
-    for (b in seq_len(n_batches)) {
-      idx_start <- (b - 1) * batch_size + 1
-      idx_end <- min(b * batch_size, n)
-      anno <- annotatePeak(pos_gr[idx_start:idx_end], TxDb = txdb,
-                           tssRegion = tssRegion, level = "transcript",
-                           annoDb = NULL, verbose = FALSE)
-      category[idx_start:idx_end] <- as.data.frame(anno)$annotation
-      rm(anno); gc(verbose = FALSE)
-    }
-  }
-
-  category <- gsub(" \\(.*", "", category)
-  category <- gsub("Distal Intergenic", "Intergenic", category)
-  category <- gsub("Downstream.*", "Downstream", category)
-
-  if (length(enhancer_gr) > 0) {
-    enh_hits <- findOverlaps(pos_gr, enhancer_gr, ignore.strand = TRUE)
-    category[queryHits(enh_hits)] <- "Enhancer"
-  }
-
-  category
 }
 
 # ── CAGEfightR enhancer detection ─────────────────────────────────────────────
@@ -451,19 +385,10 @@ message("Written: ", chisq_f)
 # ── Visualization ─────────────────────────────────────────────────────────────
 message("\nGenerating figures...")
 
-if (fast_mode) {
-  cat_order <- c("Promoter", "5' UTR", "3' UTR", "CDS", "Intron", "Intergenic")
-} else {
-  cat_order <- c("Promoter", "Enhancer", "5' UTR", "3' UTR", "Exon", "Intron", "Downstream", "Intergenic")
-}
-cat_order <- intersect(cat_order, unique(summary_dt$category))
-
-cat_colors <- c(
-  Promoter = "#2166ac", Enhancer = "#b2182b",
-  `5' UTR` = "#92c5de", `3' UTR` = "#f4a582",
-  CDS = "#4daf4a", Exon = "#4daf4a", Intron = "#984ea3",
-  Downstream = "#ff7f00", Intergenic = "#999999"
-)
+# The shared order covers both modes, so intersecting it with the categories
+# actually observed is what selects the mode's own set.
+cat_order <- intersect(LOC_CATEGORY_ORDER, unique(summary_dt$category))
+cat_colors <- LOC_CATEGORY_COLORS
 
 plot_dt <- melt(summary_dt, id.vars = c("end_type", "category"),
                 measure.vars = c("pct_reads", "pct_positions"),

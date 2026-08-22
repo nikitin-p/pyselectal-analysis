@@ -26,3 +26,6 @@ config/samples_S.tsv
 reports/
 __pycache__/
 TODO.md
+.claude/
+download_human_figures.sh
+results_human/

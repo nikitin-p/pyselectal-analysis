@@ -177,10 +177,23 @@ a8_max_dist:             20      # clustering distance; MUST equal Stage 8's --m
 # "Exotic" here means every fine type other than 1Sg, so M is included: the
 # question is where the non-canonical signal comes from, and unclipped starts
 # are the largest non-canonical class by an order of magnitude. Dominance is
-# decided per CTSS position rather than per distclu cluster, so the depth floor
-# below leaves most positions uncallable by construction; that bucket is drawn
-# rather than dropped. Every statistical parameter is shared with Stage 17.
+# decided per CTSS position rather than per distclu cluster, and the depth
+# floor is this stage's own (exo_min_depth) rather than Stage 17's, because a
+# single position is far shallower than a distclu cluster and Stage 17's floor
+# would leave almost every position uncallable. Positions below the floor are
+# drawn as their own class rather than dropped. Every other statistical
+# parameter is shared with Stage 17.
 results_exotic_origins:  "results/exotic_origins"
+exo_min_depth:           10      # pooled reads at the position, all types, for it to be callable
 exo_top_types:           12      # exotic types drawn individually; the rest pool into "other"
 exo_point_cap:           2000    # jittered points drawn per raincloud group
 exo_seed:                42      # seed for that thinning
+
+# Step 3 builds one genomic-context motif per dominating type, over a window of
+# exo_motif_flank bases each side of the dominated position, in the TSS-relative
+# frame where +1 is the first templated base and there is no zero. A type is
+# drawn only once it dominates exo_motif_min_positions positions, because below
+# that a per-base frequency is noise; the types below the floor are still
+# tabulated, flagged rather than dropped.
+exo_motif_flank:         15      # bases each side of the dominated position
+exo_motif_min_positions: 20      # positions a type needs before its own logo is drawn

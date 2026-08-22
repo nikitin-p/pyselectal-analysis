@@ -24,6 +24,12 @@ END_TYPES <- c("1Sg", "2Sgg", "3Sggg", "2Stg",
 
 END_TYPES_REAL <- setdiff(END_TYPES, "other")
 
+# The canonical class: the single untemplated G that is the CAGE / oligo-capping
+# signature. It is named here rather than at each use site, so that a stage
+# defining "exotic" as "not the canonical type" reads it from the vocabulary
+# instead of hardcoding the label.
+END_TYPE_CANONICAL <- END_TYPES[1]
+
 # ── the genome-adjacent clip base ─────────────────────────────────────────────
 # A fine-type label is <clip length>S<clip sequence>, with the clip written in
 # the read's original 5'->3' orientation (see clip5_seq() in

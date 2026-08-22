@@ -3,7 +3,7 @@ yeast_cage_ana_r1	yeast_cage	data/sacCer3.fa	anaerobic	1	total	-	results/bam_sel
 yeast_cage_ana_r2	yeast_cage	data/sacCer3.fa	anaerobic	2	total	-	results/bam_selected/yeast_cage_ana_r2_2Sga.bam
 yeast_cage_eth_r1	yeast_cage	data/sacCer3.fa	ethanol	1	total	-	results/bam_selected/yeast_cage_eth_r1_2Sga.bam
 yeast_cage_eth_r2	yeast_cage	data/sacCer3.fa	ethanol	2	total	-	results/bam_selected/yeast_cage_eth_r2_2Sga.bam
-yeast_cage_glu_r1	yeast_cage	data/sacCer3.fa	glucose	1	total	-	results/bam_selected/yeast_cage_glu_r1_2Sga.bam
+# REMOVED (low depth, 1.83M uniquely mapped): yeast_cage_glu_r1	yeast_cage	data/sacCer3.fa	glucose	1	total	-	results/bam_selected/yeast_cage_glu_r1_2Sga.bam
 yeast_cage_glu_r2	yeast_cage	data/sacCer3.fa	glucose	2	total	-	results/bam_selected/yeast_cage_glu_r2_2Sga.bam
 yeast_cage_nit_r1	yeast_cage	data/sacCer3.fa	nitrogen	1	total	-	results/bam_selected/yeast_cage_nit_r1_2Sga.bam
 yeast_cage_nit_r2	yeast_cage	data/sacCer3.fa	nitrogen	2	total	-	results/bam_selected/yeast_cage_nit_r2_2Sga.bam

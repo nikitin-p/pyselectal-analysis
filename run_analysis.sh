@@ -66,7 +66,7 @@ fi
 
 # ── Stage 2: subsampling ──────────────────────────────────────────────────────
 log_info "Stage 2: subsampling to equal depth"
-bash "$ROOT_DIR/scripts/02_subsample/01_subsample.sh" --params "$PARAMS" $FORCE_FLAG
+bash "$ROOT_DIR/scripts/02_subsample/01_subsample.sh" --params "$PARAMS" --samples "$SAMPLES" $FORCE_FLAG
 
 # ── Stage 3: pyselectal --count ───────────────────────────────────────────────
 log_info "Stage 3: 5' end type counts"
@@ -164,7 +164,7 @@ bash "$ROOT_DIR/scripts/11_a8_saturation/run.sh" --params "$PARAMS" --samples "$
 # Reads Stage 17's tables, so it must follow it. It takes no sample sheet,
 # because every input is already pooled over the libraries.
 log_info "Stage 19: origins of the exotic 5' end types"
-bash "$ROOT_DIR/scripts/12_exotic_origins/run.sh" --params "$PARAMS" $FORCE_FLAG
+bash "$ROOT_DIR/scripts/12_exotic_origins/run.sh" --params "$PARAMS" --samples "$SAMPLES" $FORCE_FLAG
 
 # ── Stage 14: HTML analysis report ───────────────────────────────────────────
 # The report's prose, its figures and its synthesis are written about the yeast

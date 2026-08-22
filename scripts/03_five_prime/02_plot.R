@@ -96,6 +96,19 @@ meta <- read_tsv(samples_f, comment = "#", col_types = cols(.default = "c"))
 tsv_files <- list.files(counts_dir, pattern = "_counts\\.tsv$", full.names = TRUE)
 if (length(tsv_files) == 0) stop("No *_counts.tsv files found in: ", counts_dir)
 
+# The counts directory is written once per library and is never pruned, so it
+# outlives the sample sheet: a library commented out of the sheet keeps its
+# count table on disk. Restricting to the sheet here is what makes such a
+# removal take effect, since the join below would otherwise carry the orphaned
+# library through under its raw identifier and plot it with the rest.
+keep <- sub("_counts\\.tsv$", "", basename(tsv_files)) %in% meta$sample_id
+if (!any(keep)) stop("No *_counts.tsv file in ", counts_dir,
+                     " matches a sample in: ", samples_f)
+if (any(!keep))
+  message("Ignoring ", sum(!keep), " count table(s) absent from the sample sheet: ",
+          paste(sub("_counts\\.tsv$", "", basename(tsv_files[!keep])), collapse = ", "))
+tsv_files <- tsv_files[keep]
+
 counts_raw <- lapply(tsv_files, function(f) {
   sid <- sub("_counts\\.tsv$", "", basename(f))
   df  <- read_tsv(f, col_types = cols(type = "c", count = "d"))
@@ -183,16 +196,18 @@ ggsave(file.path(outdir, "03_per_sample_histogram.pdf"),
 message("Saved: 03_per_sample_histogram.pdf")
 
 # ── heatmap of Z-scores: samples × categories ────────────────────────────────
-# The end types are no longer clustered: their order is biologically meaningful
-# (Sg → Sgg → Sggg is the G-appending series), so the columns are held fixed and
-# only the samples are clustered, which is what the replicate check needs.
+# The end types are not clustered here either: the columns are ordered by their
+# pooled abundance, from the most to the least frequent end type, and only the
+# samples are clustered, which is what the replicate check needs.
 count_mat <- counts_agg |>
   select(sample_id, category, count) |>
   pivot_wider(names_from = category, values_from = count, values_fill = 0) |>
   column_to_rownames("sample_id") |>
   as.matrix()
 
-keep_cats <- intersect(cat_levels, colnames(count_mat))
+# Columns run in descending order of the pooled alignment count.
+cat_desc  <- as.character(cat_overall$category[order(-cat_overall$count)])
+keep_cats <- intersect(cat_desc, colnames(count_mat))
 count_mat <- count_mat[, keep_cats, drop = FALSE]
 
 # Z-score of log-transformed counts (row-wise): each sample normalized independently
@@ -258,7 +273,7 @@ p_dend <- ggplot(ggdendro::segment(dd)) +
 subtitle <- paste0(
   "Z-scores are taken along rows: each sample is scaled across the ",
   length(keep_cats), " end types, z = (log10 count - row mean) / row SD.\n",
-  "End types are held in a fixed order and are not clustered; samples are clustered on their Z-score profiles.")
+  "End types are ordered by their pooled abundance and are not clustered; samples are clustered on their Z-score profiles.")
 if (nrow(low_cats) > 0) {
   subtitle <- paste0(subtitle, "\nBelow 1% of all alignments: ",
                      paste(sprintf("%s (%.2f%%)", low_cats$category, low_cats$pct),

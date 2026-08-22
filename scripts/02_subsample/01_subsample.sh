@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 # Stage 2: subsample BAMs to equal depth.
-# Usage: bash scripts/02_subsample/01_subsample.sh [--bam_dir DIR] [--out_dir DIR] [--force]
+# Usage: bash scripts/02_subsample/01_subsample.sh [--bam_dir DIR] [--out_dir DIR]
+#                                                 [--samples FILE] [--force]
 #
-# 1. Count uniquely mapped reads (not alignments) in every *_uniq.bam.
+# 1. Count uniquely mapped reads (not alignments) in every *_uniq.bam whose
+#    sample_id appears uncommented in the sample sheet. A library that has been
+#    commented out of the sheet is invisible to every step below, so it neither
+#    sets the subsampling target nor receives a subsampled BAM of its own.
 # 2. Compute Q1, Q3, IQR across all libraries.
 # 3. Exclude libraries whose depth < Q1 - 1.5×IQR (Tukey lower fence).
 # 4. Set target = floor(subsample_factor * min(retained depths)).
@@ -22,12 +26,14 @@ source "$PROJECT_ROOT/scripts/utils/parse_yaml.sh"
 FORCE=0
 BAM_IN_DIR=""
 BAM_OUT_DIR=""
+SAMPLES_ARG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --bam_dir) BAM_IN_DIR="$2";  shift 2 ;;
         --params)  PARAMS_ARG="$2";  shift 2 ;;
         --out_dir) BAM_OUT_DIR="$2"; shift 2 ;;
+        --samples) SAMPLES_ARG="$2"; shift 2 ;;
         --force)   FORCE=1;          shift   ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -35,6 +41,8 @@ done
 
 # ── config ────────────────────────────────────────────────────────────────────
 PARAMS="${PARAMS_ARG:-$PROJECT_ROOT/config/params.yaml}"
+SAMPLES_TSV="${SAMPLES_ARG:-$PROJECT_ROOT/config/samples.tsv}"
+[[ -f "$SAMPLES_TSV" ]] || die "Samples file not found: $SAMPLES_TSV"
 [[ -z "$BAM_IN_DIR"  ]] && BAM_IN_DIR="$(yaml_get results_bam     "$PARAMS")"
 [[ -z "$BAM_OUT_DIR" ]] && BAM_OUT_DIR="$(yaml_get results_bam_sub "$PARAMS")"
 [[ "$BAM_IN_DIR"  != /* ]] && BAM_IN_DIR="$PROJECT_ROOT/$BAM_IN_DIR"
@@ -68,12 +76,23 @@ SAMPLES=()
 COUNTS=()
 BAMS=()
 
+# The sheet is the single source of truth for which libraries take part. It is
+# read into a space-delimited string rather than an associative array so that
+# the script keeps working under the bash 3.2 that ships with macOS.
+WANTED=" $(grep -v '^#' "$SAMPLES_TSV" | tail -n +2 | cut -f1 | tr '\n' ' ')"
+[[ "$WANTED" =~ [^[:space:]] ]] || die "No uncommented samples found in $SAMPLES_TSV"
+
 for BAM in "$BAM_IN_DIR"/*_uniq.bam; do
     [[ -f "$BAM" ]] || continue
+    SAMPLE=$(basename "$BAM" _uniq.bam)
+    if [[ "$WANTED" != *" $SAMPLE "* ]]; then
+        log_info "  $SAMPLE — not in $(basename "$SAMPLES_TSV"), skipping"
+        continue
+    fi
     BAMS+=("$BAM")
 done
 
-[[ ${#BAMS[@]} -eq 0 ]] && die "No *_uniq.bam files found in $BAM_IN_DIR"
+[[ ${#BAMS[@]} -eq 0 ]] && die "No *_uniq.bam files in $BAM_IN_DIR match $SAMPLES_TSV"
 
 log_info "Found ${#BAMS[@]} BAMs — counting reads..."
 

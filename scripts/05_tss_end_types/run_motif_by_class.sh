@@ -24,6 +24,8 @@ FORCE=""
 log_info "Running motif analysis by initiator dinucleotide class..."
 
 Rscript scripts/05_tss_end_types/10_motif_by_dinuc_class.R \
+    --level      ctss \
+    --tss        results/tss/tss_matrix.tsv \
     --ctss       results/tss/typed_ctss.tsv.gz \
     --samples    config/samples.tsv \
     --genome     data/sacCer3.fa \

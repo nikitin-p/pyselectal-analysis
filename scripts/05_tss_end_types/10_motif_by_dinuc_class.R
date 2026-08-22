@@ -19,9 +19,23 @@
 # 44,000 reads. See results/dinuc_position/dinuc_class_by_position.tsv for the per-type depth
 # that this choice is based on.
 #
+# What one site is: --level
+# -------------------------
+# The default, --level ctss, treats every single-base 5' position as its own site, so a promoter
+# that fires from a spread of nearby bases contributes one window per base. This is the level at
+# which the end-type question is actually posed: the clip is a property of a start base, not of
+# a promoter.
+#
+# --level tss instead treats a distclu tag cluster from results/tss/tss_matrix.tsv as one site,
+# anchoring the window on the cluster's dominant position and weighting it by the whole
+# cluster's typed counts. Because the dominant position of a cluster is overwhelmingly a
+# canonical initiator, that level collapses the non-YR panels to a few hundred sites and makes
+# most of the grid unreadable; it answers "what does a promoter look like" rather than "what
+# does a start base look like". Its outputs carry a _tss tag so the two levels never collide.
+#
 # How the matrices are built
 # --------------------------
-# Windows are extracted once for the union of CTSS positions, and each (end type, class)
+# Windows are extracted once for the union of site positions, and each (end type, class)
 # matrix is then a read-weighted base tally over the relevant subset of rows. No positions are
 # sampled, so the matrices are exact rather than Monte Carlo estimates, and a position that
 # carries a thousand reads counts a thousand times as much as a position carrying one. This
@@ -42,7 +56,7 @@
 #   reads     — each position contributes in proportion to its read count. This is what the
 #               sequencer saw, and it is the right view when asking what the bulk of the
 #               material of a given end type looks like.
-#   positions — each CTSS contributes once. This is immune to locus domination, and it is the
+#   positions — each site contributes once. This is immune to locus domination, and it is the
 #               right view when asking what sequence context permits an end type at all.
 #
 # Where the two agree the motif is a property of the end type. Where they disagree the read-
@@ -60,6 +74,8 @@
 #
 # Usage:
 #   Rscript scripts/05_tss_end_types/10_motif_by_dinuc_class.R \
+#       [--level      tss]                            \
+#       [--tss        results/tss/tss_matrix.tsv]     \
 #       [--ctss       results/tss/typed_ctss.tsv.gz]  \
 #       [--samples    config/samples.tsv]             \
 #       [--genome     data/sacCer3.fa]                \
@@ -123,7 +139,9 @@ validate_args <- function() {
   }
 }
 
+level      <- get_arg("--level",      "ctss")
 ctss_f     <- get_arg("--ctss",       "results/tss/typed_ctss.tsv.gz")
+tss_f      <- get_arg("--tss",        "results/tss/tss_matrix.tsv")
 samples_f  <- get_arg("--samples",    "config/samples.tsv")
 genome_f   <- get_arg("--genome",     NULL)
 outdir     <- get_arg("--outdir",     "results/motifs")
@@ -141,6 +159,7 @@ if (is.na(upstream)   || upstream   < 1L) stop("--upstream must be a positive in
 if (is.na(downstream) || downstream < 1L) stop("--downstream must be a positive integer")
 if (is.na(min_reads)  || min_reads  < 0L) stop("--min_reads must be a non-negative integer")
 if (is.na(min_ess)    || min_ess    <= 0) stop("--min_ess must be a positive number")
+if (!level %in% c("tss", "ctss")) stop("--level must be 'tss' or 'ctss', got: ", level)
 
 TYPES <- trimws(strsplit(types_arg, ",", fixed = TRUE)[[1]])
 TYPES <- TYPES[nzchar(TYPES)]
@@ -149,8 +168,12 @@ if (length(TYPES) == 0) stop("--types is empty")
 dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figdir, recursive = TRUE, showWarnings = FALSE)
 
-out_pwm    <- file.path(outdir, "motif_by_dinuc_class_pwm.tsv")
-out_counts <- file.path(outdir, "motif_by_dinuc_class_counts.tsv")
+# The CTSS level is the default, so it keeps the plain output names; a TSS-level run is tagged
+# so that the two levels cannot overwrite each other's tables and figures.
+sfx        <- if (level == "tss") "_tss" else ""
+
+out_pwm    <- file.path(outdir, paste0("motif_by_dinuc_class_pwm", sfx, ".tsv"))
+out_counts <- file.path(outdir, paste0("motif_by_dinuc_class_counts", sfx, ".tsv"))
 
 if (!force && file.exists(out_pwm)) {
   message("Output exists, skipping (use --force to rerun): ", out_pwm)
@@ -169,6 +192,10 @@ BASES      <- c("A", "C", "G", "T")
 CLASSES    <- c("YR", "YY", "RR", "RY")
 PANELS     <- c("all", CLASSES)
 WEIGHTINGS <- c("reads", "positions")
+
+# What one row of the site table is, in words, for titles and captions.
+SITE_PL <- if (level == "tss") "TSSs" else "CTSS positions"
+SITE_SG <- if (level == "tss") "TSS"  else "CTSS position"
 
 # The clip base each type implies at -1 under local alignment; M is unconstrained.
 # END_TYPE_CLIP_BASE is defined once in scripts/utils/end_types.R over the full
@@ -208,28 +235,49 @@ load_genome <- function(spec) {
 
 genome <- load_genome(genome_f)
 
-# ── load typed CTSS and combine samples ───────────────────────────────────────
-message("Loading typed CTSS: ", ctss_f)
-ctss <- fread(cmd = paste("gzip -cd", shQuote(ctss_f)))
-message("  rows: ", nrow(ctss))
+# ── load the site table and combine samples ───────────────────────────────────
+# Under --level tss each site is a distclu tag cluster: the window is anchored on the cluster's
+# dominant position and weighted by the typed counts of the whole cluster, so a promoter with a
+# spread of start sites counts once rather than once per base it fires from.
+# Under --level ctss each site is a single-base CTSS, which is the older behaviour.
+tcols <- paste0("n_", TYPES)
 
-tcols   <- paste0("n_", TYPES)
-missing <- setdiff(tcols, colnames(ctss))
-if (length(missing) > 0) {
-  stop("Missing end-type columns in ", ctss_f, ": ", paste(missing, collapse = ", "),
-       "\n  Available: ", paste(grep("^n_", colnames(ctss), value = TRUE), collapse = ", "))
+check_types <- function(dt, src) {
+  missing <- setdiff(tcols, colnames(dt))
+  if (length(missing) > 0) {
+    stop("Missing end-type columns in ", src, ": ", paste(missing, collapse = ", "),
+         "\n  Available: ", paste(grep("^n_", colnames(dt), value = TRUE), collapse = ", "))
+  }
 }
 
-message("Combining samples...")
-agg <- ctss[, lapply(.SD, sum), by = .(chr, pos, strand), .SDcols = tcols]
-rm(ctss); invisible(gc(verbose = FALSE))
-message("  unique positions: ", nrow(agg))
+if (level == "tss") {
+  message("Loading TSS matrix: ", tss_f)
+  if (!file.exists(tss_f)) stop("TSS matrix not found: ", tss_f,
+                                "\n  Run scripts/05_tss_end_types/run.sh first, or pass --level ctss.")
+  tss <- fread(tss_f)
+  message("  rows: ", nrow(tss))
+  check_types(tss, tss_f)
+  message("Combining samples over tag clusters...")
+  # Tag clusters are disjoint within a (chr, strand), so their dominant positions are unique and
+  # this grouping only collapses the per-sample rows of one cluster.
+  agg <- tss[, lapply(.SD, sum), by = .(chr, pos = tss_pos, strand), .SDcols = tcols]
+  rm(tss); invisible(gc(verbose = FALSE))
+} else {
+  message("Loading typed CTSS: ", ctss_f)
+  ctss <- fread(cmd = paste("gzip -cd", shQuote(ctss_f)))
+  message("  rows: ", nrow(ctss))
+  check_types(ctss, ctss_f)
+  message("Combining samples...")
+  agg <- ctss[, lapply(.SD, sum), by = .(chr, pos, strand), .SDcols = tcols]
+  rm(ctss); invisible(gc(verbose = FALSE))
+}
+message("  unique ", SITE_PL, ": ", nrow(agg))
 
-# Drop positions carrying no read of any requested type; they cost window extraction time
+# Drop sites carrying no read of any requested type; they cost window extraction time
 # and contribute nothing to any matrix.
 keep_any <- rowSums(as.matrix(agg[, ..tcols])) > 0
 agg <- agg[keep_any]
-message("  positions with at least one read of a requested type: ", nrow(agg))
+message("  ", SITE_PL, " with at least one read of a requested type: ", nrow(agg))
 
 # ── window extraction ─────────────────────────────────────────────────────────
 # +1 is the first templated base and sits at `pos`; -1 is the base immediately upstream.
@@ -355,6 +403,7 @@ for (typ in TYPES) {
 }
 
 depth <- rbindlist(depth_dt)
+depth[, level := level]
 fwrite(depth, out_counts, sep = "\t")
 message("Written: ", out_counts)
 
@@ -389,10 +438,12 @@ to_ppm <- function(m) {
   mm
 }
 
-# The title carries the two numbers needed to judge the panel: how much data it rests on, and
-# how concentrated that data is.
-unit_label <- function(w) if (w == "reads") "alignments" else "positions"
-wt_label   <- function(w) if (w == "reads") "alignment" else "position"
+# The title carries the two counts needed to judge the panel: how many alignments it rests on,
+# and how many distinct CTSSs those alignments come from. The effective sample size behind the
+# CONCENTRATED flag stays in the counts table rather than on the figure, because the flag is the
+# part a reader acts on and the number itself needs a paragraph to interpret.
+unit_label <- function(w) if (w == "reads") "alignments" else SITE_PL
+wt_label   <- function(w) if (w == "reads") "alignment" else SITE_SG
 
 panel_title <- function(d, weighting) {
   lab <- if (d$panel == "all") "all initiators" else d$panel
@@ -401,8 +452,12 @@ panel_title <- function(d, weighting) {
   flag <- if (!d$usable) ", LOW"
           else if (weighting == "reads" && !d$read_weighting_ok) ", CONCENTRATED"
           else ""
-  paste0(d$end_type, " | ", lab, "  (", format(n, big.mark = ","), " ", unit,
-         ", ESS ", format(round(d$ess), big.mark = ","), flag, ")")
+  # The alignment-weighted panel also names the number of sites those alignments come from,
+  # because an alignment count alone does not say whether the logo rests on many loci or a few.
+  extra <- if (weighting == "reads")
+             paste0(" over ", format(d$n_positions, big.mark = ","), " ", SITE_PL) else ""
+  paste0(d$end_type, " | ", lab, "  (", format(n, big.mark = ","), " ", unit, extra,
+         flag, ")")
 }
 
 x_breaks <- which(pos_lab %% 5 == 0 | pos_lab %in% c(-1L, 1L))
@@ -419,26 +474,35 @@ weight_blurb <- function(weighting) {
     paste0("Each position contributes in proportion to its alignment count, so this is what the ",
            "bulk of the sequenced material of that end type looks like.")
   } else {
-    paste0("Each CTSS contributes once regardless of depth, so this is what sequence context ",
-           "permits that end type at all, immune to a few deep loci.")
+    paste0("Each ", SITE_SG, " contributes once regardless of depth, so this is what sequence ",
+           "context permits that end type at all, immune to a few deep loci.")
   }
+}
+
+# One sentence saying what a site is, since the whole figure hangs on it.
+site_blurb <- if (level == "tss") {
+  paste0("Each site is a distclu tag cluster from ", basename(tss_f), ": the window is anchored ",
+         "on the cluster's dominant position and carries the typed counts of the whole cluster, ",
+         "so a promoter counts once rather than once per base it fires from.")
+} else {
+  paste0("Each site is a single-base CTSS from ", basename(ctss_f),
+         ", so a promoter that fires from several bases contributes one window per base.")
 }
 
 cap_for <- function(weighting) paste0(
   "Position +1 is the first templated base; there is no zero position, and the initiator ",
   "dinucleotide is (-1, +1). Weighting: ", toupper(unit_label(weighting)), ". ", weight_blurb(weighting),
-  "\nEvery CTSS at which the end type occurs is used; nothing is sampled, so the matrices are ",
+  "\nEvery ", SITE_SG, " at which the end type occurs is used; nothing is sampled, so the ",
+  "matrices are ",
   "exact. The 'all initiators' column is the union of the four class columns.\n",
-  "ESS is Kish's effective sample size, (sum w)^2 / sum(w^2): the number of equally weighted ",
-  "positions the ALIGNMENT-weighted panel is worth. CAGE depth is always skewed, so a large gap ",
-  "between ESS and the position count is normal;\nCONCENTRATED marks ESS below ",
-  format(min_ess, big.mark = ","), ", where the alignment-weighted logo is a few loci and the ",
-  "position-weighted companion figure is the one to read. LOW marks fewer than ",
-  format(min_reads, big.mark = ","), " alignments or positions.\n",
+  "CONCENTRATED marks a panel whose alignments pile onto so few loci that the alignment-weighted ",
+  "logo describes those loci rather than the end type; read its ", SITE_SG, "-weighted companion ",
+  "instead.\nThe effective sample size that sets the mark is in results/motifs/*_counts.tsv. ",
+  "LOW marks fewer than ", format(min_reads, big.mark = ","), " alignments or ", SITE_PL, ".\n",
   "STAR ran with --alignEndsType Local, so for every soft-clipped type the genomic base at ",
   "-1 cannot equal the clip base (G for 1Sg and 2Sgg, A/C/T for 1Sa/1Sc/1St); the -1 letter ",
   "of those logos is depleted of that base by construction.\nM alignments carry no clip and no ",
-  "such constraint. Genome: ", basename(genome_f), ". All samples combined."
+  "such constraint. Genome: ", basename(genome_f), ". All samples combined.\n", site_blurb
 )
 
 build_list <- function(keys, weighting) {
@@ -466,7 +530,7 @@ for (weighting in WEIGHTINGS) {
          x = "Position relative to the 5' end", y = "Bits", caption = cap_for(weighting)) +
     logo_theme
 
-  out_g <- file.path(figdir, paste0("15_motif_by_dinuc_class_", weighting, ".pdf"))
+  out_g <- file.path(figdir, paste0("15_motif_by_dinuc_class_", weighting, sfx, ".pdf"))
   ggsave(out_g, p_grid,
          width = 3.6 * length(PANELS), height = 1.9 * length(TYPES) + 1.8,
          limitsize = FALSE)
@@ -490,13 +554,14 @@ for (typ in TYPES) {
   p <- ggseqlogo(lst, method = "bits", ncol = length(WEIGHTINGS)) +
     scale_x_continuous(breaks = x_breaks, labels = pos_lab[x_breaks]) +
     labs(title = paste0(typ, ": sequence context by initiator dinucleotide class"),
-         subtitle = "Left column alignment-weighted, right column position-weighted",
+         subtitle = paste0("Left column alignment-weighted, right column ",
+                           SITE_SG, "-weighted"),
          x = "Position relative to the 5' end", y = "Bits",
          caption = paste0(cap_for("reads"), "\nThe right-hand column of this page is ",
-                          "position-weighted: ", weight_blurb("positions"))) +
+                          SITE_SG, "-weighted: ", weight_blurb("positions"))) +
     logo_theme
 
-  out_t <- file.path(figdir, paste0("15_motif_", typ, "_by_dinuc_class.pdf"))
+  out_t <- file.path(figdir, paste0("15_motif_", typ, "_by_dinuc_class", sfx, ".pdf"))
   ggsave(out_t, p, width = 7.5 * length(WEIGHTINGS),
          height = 1.9 * length(PANELS) + 2.0, limitsize = FALSE)
   message("Written: ", out_t)
@@ -536,7 +601,7 @@ if ("1Sg" %in% TYPES && length(TYPES) > 1) {
                             "comparable between types. Weighting: ", toupper(unit_label(wt)), ". ",
                             weight_blurb(wt)))
 
-    out_diff <- file.path(figdir, paste0("15_motif_diff_vs_1Sg_by_class_", wt, ".pdf"))
+    out_diff <- file.path(figdir, paste0("15_motif_diff_vs_1Sg_by_class_", wt, sfx, ".pdf"))
     ggsave(out_diff, p_diff, width = 15, height = 1.5 * length(unique(cmp$end_type)) + 2.2,
            limitsize = FALSE)
     message("Written: ", out_diff)

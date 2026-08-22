@@ -102,6 +102,19 @@ meta <- read_tsv(samples_f, comment = "#", col_types = cols(.default = "c"))
 tsv_files <- list.files(counts_dir, pattern = "_counts\\.tsv$", full.names = TRUE)
 if (length(tsv_files) == 0) stop("No *_counts.tsv files found in: ", counts_dir)
 
+# The counts directory is written once per library and is never pruned, so it
+# outlives the sample sheet: a library commented out of the sheet keeps its
+# count table on disk. Restricting to the sheet here is what makes such a
+# removal take effect, since the join below would otherwise carry the orphaned
+# library through under its raw identifier and plot it with the rest.
+keep <- sub("_counts\\.tsv$", "", basename(tsv_files)) %in% meta$sample_id
+if (!any(keep)) stop("No *_counts.tsv file in ", counts_dir,
+                     " matches a sample in: ", samples_f)
+if (any(!keep))
+  message("Ignoring ", sum(!keep), " count table(s) absent from the sample sheet: ",
+          paste(sub("_counts\\.tsv$", "", basename(tsv_files[!keep])), collapse = ", "))
+tsv_files <- tsv_files[keep]
+
 counts_raw <- lapply(tsv_files, function(f) {
   sid <- sub("_counts\\.tsv$", "", basename(f))
   df  <- read_tsv(f, col_types = cols(type = "c", count = "d"))

@@ -28,10 +28,10 @@
 # carry no soft clip and so impose no constraint anywhere.
 #
 # Note on p-values: reads at one genomic position are not independent, so with millions of
-# 1Sg reads nearly every cell clears q < 0.05 regardless of effect size. The asterisks certify
-# direction, not importance — the fill carries the effect size. The same test computed on
-# distinct positions instead of reads is written to the TSV as a sensitivity column, and it
-# stars 83 of the 224 cells rather than 169.
+# 1Sg reads nearly every cell clears the BH cutoff regardless of effect size. The asterisks
+# certify direction, not importance — the fill carries the effect size. The same test computed
+# on distinct positions instead of reads is written to the TSV as a sensitivity column
+# (q_bh_positions). The cutoff is Q_CUT, set to 0.01.
 #
 # Usage:
 #   Rscript scripts/05_tss_end_types/09_dinuc_class_by_position.R \
@@ -328,8 +328,9 @@ res[, p_positions := mapply(prop_p, obs_positions, n_positions, exp_prop)]
 # One BH family across the whole figure: 4 classes x 2*flank positions x n end types.
 res[, q_bh           := p.adjust(p,           method = "BH")]
 res[, q_bh_positions := p.adjust(p_positions, method = "BH")]
-res[, sig := !is.na(q_bh) & q_bh < 0.05]
-message("  tests: ", nrow(res), "; significant at BH 5%: ", sum(res$sig))
+Q_CUT <- 0.01
+res[, sig := !is.na(q_bh) & q_bh < Q_CUT]
+message("  tests: ", nrow(res), "; significant at BH ", Q_CUT * 100, "%: ", sum(res$sig))
 
 # ── write tables ──────────────────────────────────────────────────────────────
 res[, end_type := factor(end_type, levels = TYPES)]
@@ -407,7 +408,8 @@ cap <- paste0(
   "Expected frequencies come from the ", basename(genome_f), " dinucleotide composition on ",
   "both strands. At columns -1 and +1 the expectation is conditioned on the STAR local-",
   "alignment constraint\n(the genomic base at -1 cannot equal the clip base), which is why ",
-  "the +1 expectation differs between clip types and M. Asterisk: BH q < 0.05 across all ",
+  "the +1 expectation differs between clip types and M. Asterisk: BH q < ", Q_CUT,
+  " across all ",
   nrow(res), " cells.\n",
   "Alignments at one position are not independent, so with millions of alignments the asterisks ",
   "certify direction rather than importance; the fill carries the effect size. Observed and ",

@@ -14,10 +14,13 @@
 # than hidden. First, Stage 8's per-position floor (dom_min_total) is NOT
 # applied: every position that carries a read is classified, because a position
 # too shallow to have joined a cluster still has exotic alignments that have to
-# be accounted for somewhere. Second, dom_min_depth is far above the depth of a
-# typical single position, so most positions fall into the "not_callable"
-# origin by construction; that is the honest answer at this unit and the figure
-# draws the bucket instead of dropping it.
+# be accounted for somewhere. Second, the depth floor is this stage's own
+# exo_min_depth rather than Stage 17's dom_min_depth, because dom_min_depth is
+# calibrated for a distclu cluster and is far above the depth of a typical
+# single position; at that floor virtually every position would be uncallable
+# and the figure would describe nothing. Positions still below exo_min_depth
+# are carried as an explicit "below_floor" call, which the figure draws instead
+# of dropping.
 #
 # Usage (from project root):
 #   Rscript scripts/12_exotic_origins/01_position_dominance.R \
@@ -88,43 +91,56 @@ counts <- ctss[, .(n = sum(n)), by = .(cluster_id, sample_id, type)]
 # here they are only a way to label the origin of an exotic alignment, so the
 # secondary threshold would double the figure for no added claim.
 threshold <- as.numeric(params$dom_thresholds)[1]
-message("Cascade at threshold ", threshold, ", depth floor ",
-        params$dom_min_depth)
+
+# The depth floor is this stage's own. A params file that predates it (the
+# human one, which does not run this stage) falls back to Stage 17's value
+# rather than failing, and says so.
+min_depth <- if (is.null(params$exo_min_depth)) {
+  message("exo_min_depth absent from the params file, falling back to ",
+          "dom_min_depth = ", params$dom_min_depth)
+  as.integer(params$dom_min_depth)
+} else {
+  as.integer(params$exo_min_depth)
+}
+message("Cascade at threshold ", threshold, ", depth floor ", min_depth)
 
 res <- call_dominance(counts, bg,
-                      min_depth            = as.integer(params$dom_min_depth),
+                      min_depth            = min_depth,
                       threshold            = threshold,
                       min_samples          = as.integer(params$dom_min_samples),
                       min_reads_per_sample = as.integer(params$dom_min_reads_per_sample),
                       fdr                  = as.numeric(params$dom_fdr))
 setnames(res, "cluster_id", "position_id")
 res[, threshold := threshold]
+res[, min_depth := min_depth]
 
-# ── origins ───────────────────────────────────────────────────────────────────
+# ── the per-position call ─────────────────────────────────────────────────────
 
-res[, origin := classify_origin(res)]
+# One call per position: "below_floor", "none", or the dominating fine type.
+# The figure turns that call into a category relative to the type of the bar it
+# is drawing, which is why no category is assigned here.
+res[, call := position_call(res)]
 
-# The four origins must partition the positions exactly once each: no position
+# The call must cover the positions exactly once each: no position
 # unclassified, none counted twice. This is asserted rather than trusted,
 # because every proportion in the figure is a proportion of this partition.
-stopifnot(!anyNA(res$origin))
+stopifnot(!anyNA(res$call))
 stopifnot(nrow(res) == uniqueN(res$position_id))
-stopifnot(sum(res[, .N, by = origin]$N) == nrow(res))
 
 # Positions carry chr, strand and pos in their id; splitting them back out
 # keeps the table joinable to the rest of the pipeline without re-parsing.
 res[, c("chr", "strand", "pos") := tstrsplit(position_id, ":", fixed = TRUE)]
 res[, pos := as.integer(pos)]
-setcolorder(res, c("position_id", "chr", "pos", "strand", "origin", "dom_type",
+setcolorder(res, c("position_id", "chr", "pos", "strand", "call", "dom_type",
                    "n_dom", "n_total", "frac"))
 
 summ <- res[, .(n_positions = .N,
                 n_alignments = sum(n_total),
-                median_depth = as.numeric(median(n_total))), by = origin]
-setorder(summ, origin)
+                median_depth = as.numeric(median(n_total))), by = call]
+setorder(summ, -n_positions)
 summ[, pct_positions := 100 * n_positions / sum(n_positions)]
-fwrite(summ, file.path(outdir, "origin_summary.tsv"), sep = "\t")
-message("Written: ", file.path(outdir, "origin_summary.tsv"))
+fwrite(summ, file.path(outdir, "call_summary.tsv"), sep = "\t")
+message("Written: ", file.path(outdir, "call_summary.tsv"))
 print(summ)
 
 # The sentinel is written last, so that an interrupted run leaves no file that
