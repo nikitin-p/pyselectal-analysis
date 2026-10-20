@@ -7,6 +7,8 @@
 #   2. Form the 88 testable pairs, test A-8 against each pair's own background,
 #      and bootstrap the effect size over clusters
 #   3. Render the bubble plots, the profile and the sensitivity comparison
+#   4. Repeat the test with the dinucleotides pooled into YR / RY / RR / YY and
+#      render the class-level bubble plots
 #
 # Usage:
 #   bash scripts/11_a8_saturation/run.sh [--force]
@@ -71,8 +73,16 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/03_plot.R" \
     --figdir  "$FIG_DIR" \
     --params  "$PARAMS" $FORCE_FLAG
 
+log_info "  step 4: dinucleotide-class tests and figures"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/04_class_test.R" \
+    --windows "$A8_DIR/pair_windows.tsv.gz" \
+    --outdir  "$A8_DIR" \
+    --figdir  "$FIG_DIR" \
+    --params  "$PARAMS" $FORCE_FLAG
+
 log_info "Stage 18 complete."
 log_info "  tests   → results/a8/a8_pair_tests.tsv"
+log_info "  classes → results/a8/a8_class_tests.tsv"
 log_info "  sizes   → results/a8/a8_pair_sizes.tsv"
 log_info "  profile → results/a8/a8_position_profile.tsv"
 log_info "  figures → results/figures/19_a8_*.pdf"

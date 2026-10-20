@@ -45,7 +45,7 @@ mapped_prefix: 5           # bases of matched sequence to show for M-type ends
 # The end-type vocabulary, mirroring scripts/utils/end_types.R for the one bash
 # consumer that cannot source R. Keep the two in the same order; the R file is
 # authoritative and test/run_end_types_test.sh checks that they agree.
-end_types: "1Sg 2Sgg 3Sggg 2Stg 1Sa 2Sga 1St 1Sc M"
+end_types: "1Sg 2Sgg 3Sggg 2Stg 3Sgtg 3Sttg 3Sctg 2Sag 1Sa 2Sga 2Saa 3Sgaa 1St 3Sgat 1Sc M"
 
 # ── Annotation BED files ─────────────────────────────────────────────────────
 # sacCer3: gene-level BED6 derived from data/sacCer3.ensGene.gtf by
@@ -64,6 +64,37 @@ genome_fasta:   "data/sacCer3.fa"
 annotation_gtf: "data/sacCer3.ensGene.gtf"
 annotation_bed: "data/sacCer3.genes.bed"
 go_orgdb:       "org.Sc.sgd.db"
+
+# Promoter window, in bases upstream and downstream of an annotated transcript
+# start, applied by scripts/utils/localization.R to Stages 9 (motif selection),
+# 10 and 19. The upstream arm is 300 bp rather than the conventional 1 kb: the
+# sacCer3 annotation carries no UTRs, so the annotated start is the ATG, and the
+# median gap from an ATG to the gene upstream of it is 363 bp. A 1 kb arm reaches
+# into that neighbouring gene for 89 % of transcripts and puts 54 % of the
+# promoter territory inside a coding sequence; a 300 bp arm lowers that to 18 %.
+promoter_upstream:   300
+promoter_downstream: 100
+
+# Which definition of "Promoter" the localization of Stages 10 and 19 uses.
+# "window" is the fixed window above. "clusters" is the data-derived promoter of
+# scripts/05_tss_end_types/promoter_helpers.R: windows of the lengths in
+# promoter_cluster_windows end strictly upstream of a gene's annotated start and
+# are tried shortest first, the Stage 8 TSS clusters on the gene's strand that
+# overlap the first window reaching any cluster are its promoter clusters, and
+# the promoter runs from such a cluster's upstream edge to the gene start. The
+# table is written to <results_root>/tss/promoter_clusters.tsv by
+# 12_promoter_clusters.R, and 13_promoter_window_sweep.R compares the settings.
+# The window then plays no part in the labelling, although the motif selection
+# of Stage 9 and the enhancer detection of Stage 10 still use it.
+promoter_source:          clusters
+promoter_cluster_windows: [15, 20, 25, 30, 35, 40]
+# An external estimate of the expressed genes, which 13_promoter_window_sweep.R
+# uses to report the window length at which the genes with a promoter reach
+# promoter_target_fraction of each target. Yeast expresses 4,600-5,000 genes
+# (Nagalakshmi et al. 2008, Science, doi 10.1126/science.1158441); 90 % of that
+# range is reached at 25-39 bp, which is why the windows above run to 40 bp.
+promoter_target_genes:    [4600, 5000]
+promoter_target_fraction: 0.9
 
 # ── Stage 10: CAGEr ───────────────────────────────────────────────────────────
 results_cager:                "results/cager"
@@ -155,16 +186,22 @@ dom_min_total:            5       # per-position pooled floor; MUST equal Stage 
 dom_max_dist:             20      # clustering distance; MUST equal Stage 8's --max_dist
 
 # ── Stage 18: A−8 saturation of <5' end type, dinucleotide> pairs ─────────────
-# The background window is frozen at -20..-11 because the pooled per-position A
-# profile is flat there (32.3-33.5 %) while -9 and -7 are shoulders of the -8
-# peak (35.8 % and 35.6 %) and -2..-7 are all mildly elevated. Position -1 is
-# excluded from every background set because it IS the first base of the
+# The primary background window is the proximal stretch -10..-2, excluding -8
+# itself, which is the immediate upstream context of the initiator and
+# therefore the local baseline the -8 position is judged against. It is a
+# conservative choice: the pooled per-position A profile is elevated there
+# (-9 and -7 are shoulders of the -8 peak at 35.8 % and 35.6 %, and -2..-7 sit
+# above the distal level) against a flat 32.3-33.5 % over -20..-11, so
+# calibrating against it subtracts part of the signal and shrinks every effect
+# size relative to the distal plateau. The plateau is retained as the
+# sensitivity background so the size of that choice stays visible. Position -1
+# is excluded from every background set because it IS the first base of the
 # initiator dinucleotide and is therefore fixed within a pair.
 results_a8:              "results/a8"
 a8_upstream:             20      # window spans -a8_upstream .. +1
 a8_obs_coord:            -8      # the position under test
-a8_bg_plateau:           [-20, -19, -18, -17, -16, -15, -14, -13, -12, -11]
-a8_bg_proximal:          [-2, -3, -4, -5, -6, -7, -9]   # sensitivity background
+a8_bg_proximal:          [-2, -3, -4, -5, -6, -7, -9, -10]  # primary background: -10..-2 minus -8
+a8_bg_plateau:           [-20, -19, -18, -17, -16, -15, -14, -13, -12, -11]  # sensitivity background
 a8_min_type_reads:       2       # reads of a type needed for a position to join its pair
 a8_min_positions:        200     # distinct qualifying CTSS needed to test a pair
 a8_n_boot:               1000    # cluster bootstrap resamples, primary config only
@@ -185,7 +222,8 @@ a8_max_dist:             20      # clustering distance; MUST equal Stage 8's --m
 # parameter is shared with Stage 17.
 results_exotic_origins:  "results/exotic_origins"
 exo_min_depth:           10      # pooled reads at the position, all types, for it to be callable
-exo_top_types:           12      # exotic types drawn individually; the rest pool into "other"
+exo_type_set:            vocabulary  # "vocabulary": END_TYPES_REAL + longclip get bars; "top": the exo_top_types most abundant
+exo_top_types:           12      # used only with exo_type_set "top": exotic types drawn individually; the rest pool into "other"
 exo_point_cap:           2000    # jittered points drawn per raincloud group
 exo_seed:                42      # seed for that thinning
 
@@ -197,3 +235,11 @@ exo_seed:                42      # seed for that thinning
 # tabulated, flagged rather than dropped.
 exo_motif_flank:         15      # bases each side of the dominated position
 exo_motif_min_positions: 20      # positions a type needs before its own logo is drawn
+
+# The two-group logo figures are drawn on a narrower window than the tables
+# and the difference panel. Everything those logos are read for -- a templated
+# clip immediately upstream of +1, the initiator dinucleotide, the A at -8 --
+# lies within ten bases of the TSS, and the wider window spends half its width
+# on the flat AT-rich yeast background that carries no per-type signal. It must
+# not exceed exo_motif_flank, which is the window the sequences are cut from.
+exo_logo_flank:          10      # bases each side, two-group context logos only

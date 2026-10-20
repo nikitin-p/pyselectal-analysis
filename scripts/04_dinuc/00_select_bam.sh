@@ -24,7 +24,7 @@ SAMPLES="$ROOT_DIR/config/samples.tsv"
 BAM_DIR=""
 OUT_DIR=""
 end_types="$(yaml_get end_types "$PARAMS")"
-TYPES="${end_types:-1Sg 2Sgg 3Sggg 2Stg 1Sa 2Sga 1St 1Sc M}"
+TYPES="${end_types:-1Sg 2Sgg 3Sggg 2Stg 3Sgtg 3Sttg 3Sctg 2Sag 1Sa 2Sga 2Saa 3Sgaa 1St 3Sgat 1Sc M}"
 # Basename stem for the generated per-type sample sheets. It must differ between
 # datasets, because these sheets are written into config/ under a fixed name and
 # a second dataset would otherwise overwrite the first dataset's sheets in place.

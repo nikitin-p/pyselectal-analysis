@@ -95,56 +95,92 @@ write.table(combined, file.path(results_dir, "dinuc_all", "endtype_by_dinuc.tsv"
 cat("Data saved to results/dinuc_all/endtype_by_dinuc.tsv\n")
 
 # ============================================================================
-# PLOT 1: Stacked bar histogram ordered by expression (total reads per dinuc)
+# PLOT 1: Stacked bar histogram over the full end-type vocabulary
 # ============================================================================
 
-# Aggregate across samples, order by total expression
+# Aggregate across samples, order by total expression. The heatmaps below take
+# their column order from this table.
 agg_by_dinuc <- combined %>%
   group_by(dinucleotide) %>%
-  summarise(
-    total = sum(n_all),
-    n_1Sg = sum(n_1Sg),
-    n_2Sgg = sum(n_2Sgg),
-    n_3Sggg = sum(n_3Sggg),
-    n_other = sum(n_other),
-    n_M = sum(n_M),
-    .groups = "drop"
-  ) %>%
-  mutate(
-    pct_1Sg = n_1Sg / total * 100,
-    pct_2Sgg = n_2Sgg / total * 100,
-    pct_3Sggg = n_3Sggg / total * 100,
-    pct_other = n_other / total * 100,
-    pct_M = n_M / total * 100
-  ) %>%
+  summarise(total = sum(n_all), .groups = "drop") %>%
   arrange(desc(total))
 
-# Pivot for stacked bar
-agg_long <- agg_by_dinuc %>%
-  select(dinucleotide, total, pct_1Sg, pct_2Sgg, pct_3Sggg, pct_other, pct_M) %>%
-  pivot_longer(cols = starts_with("pct_"), names_to = "end_type", values_to = "percentage") %>%
+# The per-type dinucleotide tables above exist for the G ladder only, so the
+# histogram draws every type of END_TYPES from the Stage 8 typed CTSS table
+# instead, and looks the initiator dinucleotide (-1, +1) up in the genome the
+# same way 01_dinuc_proportion.R does.
+params <- yaml::yaml.load_file("config/params.yaml")
+type_cols <- end_type_cols("n_")
+ctss <- data.table::fread(file.path(results_dir, "tss", "typed_ctss.tsv.gz"),
+                          data.table = FALSE) %>%
+  group_by(chr, pos, strand) %>%
+  summarise(across(all_of(type_cols), sum), .groups = "drop")
+
+fa <- Rsamtools::FaFile(params$genome_fasta)
+chr_len <- GenomeInfoDb::seqlengths(Rsamtools::scanFaIndex(fa))
+win <- GenomicRanges::promoters(
+  GenomicRanges::GRanges(ctss$chr, IRanges::IRanges(ctss$pos, width = 1), ctss$strand),
+  upstream = 1, downstream = 1)
+in_bounds <- GenomicRanges::start(win) >= 1 &
+  GenomicRanges::end(win) <= chr_len[as.character(GenomicRanges::seqnames(win))]
+ctss <- ctss[in_bounds, ]
+ctss$dinucleotide <- as.character(Biostrings::getSeq(fa, win[in_bounds]))
+
+# Logical order: YR, YY, RR, RY, alphabetical within each class.
+dinuc_classes <- c("YR", "YY", "RR", "RY")
+base_class <- c(A = "R", G = "R", C = "Y", T = "Y")
+dinuc_grid <- expand.grid(b2 = names(base_class), b1 = names(base_class),
+                          stringsAsFactors = FALSE) %>%
+  transmute(dinucleotide = paste0(b1, b2),
+            dinuc_class = factor(paste0(base_class[b1], base_class[b2]),
+                                 levels = dinuc_classes)) %>%
+  arrange(dinuc_class, dinucleotide)
+dinuc_levels <- dinuc_grid$dinucleotide
+
+fine_long <- ctss %>%
+  filter(dinucleotide %in% dinuc_levels) %>%
+  group_by(dinucleotide) %>%
+  summarise(across(all_of(type_cols), sum), .groups = "drop") %>%
+  pivot_longer(all_of(type_cols), names_to = "end_type", values_to = "n") %>%
+  group_by(dinucleotide) %>%
+  mutate(total = sum(n), percentage = n / total * 100) %>%
+  ungroup() %>%
   mutate(
-    end_type = factor(gsub("pct_", "", end_type), levels = c("M", "other", "3Sggg", "2Sgg", "1Sg")),
-    dinucleotide = factor(dinucleotide, levels = agg_by_dinuc$dinucleotide)
+    # Reversed so that the canonical type sits at the base of each bar
+    end_type = factor(sub("^n_", "", end_type), levels = rev(END_TYPES)),
+    dinucleotide = factor(dinucleotide, levels = dinuc_levels)
   )
+fine_totals <- distinct(fine_long, dinucleotide, total)
 
 # Colors for end types
 end_type_colors <- END_TYPE_COLORS_TAB10
 
 # Canonical initiator (YR) axis label colors
 yr_dinucs <- c("CA", "CG", "TA", "TG")
-axis_colors <- ifelse(agg_by_dinuc$dinucleotide %in% yr_dinucs, "#e63946", "black")
+axis_colors <- ifelse(dinuc_levels %in% yr_dinucs, "#e63946", "black")
 
-p1 <- ggplot(agg_long, aes(x = dinucleotide, y = percentage, fill = end_type)) +
+# Class labels above the bars, and separators between the classes
+class_labels <- dinuc_grid %>%
+  mutate(x = match(dinucleotide, dinuc_levels)) %>%
+  group_by(dinuc_class) %>%
+  summarise(xmid = mean(x), xmax = max(x), .groups = "drop")
+
+p1 <- ggplot(fine_long, aes(x = dinucleotide, y = percentage, fill = end_type)) +
   geom_bar(stat = "identity", position = "stack") +
-  geom_text(data = agg_by_dinuc,
+  geom_vline(xintercept = head(class_labels$xmax, -1) + 0.5,
+             linetype = "dashed", colour = "grey50") +
+  geom_text(data = fine_totals,
             aes(x = dinucleotide, y = 101, label = fmt_n(total)),
             inherit.aes = FALSE, vjust = 0, size = 2.5, colour = "grey25") +
-  scale_fill_manual(values = end_type_colors, name = "End type") +
-  scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 108)) +
+  geom_text(data = class_labels,
+            aes(x = xmid, y = 108, label = dinuc_class),
+            inherit.aes = FALSE, vjust = 0, fontface = "bold") +
+  scale_fill_manual(values = end_type_colors, name = "End type",
+                    guide = guide_legend(reverse = TRUE)) +
+  scale_y_continuous(breaks = seq(0, 100, 25), limits = c(0, 113)) +
   labs(
     title = "End-type distribution by initiator dinucleotide",
-    subtitle = paste0("Ordered by total expression (left = highest); YR initiators in red.\n",
+    subtitle = paste0("Grouped by initiator class, alphabetical within a class; YR initiators in red.\n",
                       "Labels give the total number of alignments at each initiator."),
     x = "Initiator dinucleotide",
     y = "Percentage of alignments"

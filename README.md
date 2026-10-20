@@ -352,7 +352,7 @@ The reference scripts in `cageseq2_bin/` demonstrate state-of-the-art CAGE analy
 | 3Sggg | 97.6% | 0.8% | 1.6% |
 | M | 69.9% | 18.6% | 11.3% |
 
-2Sgg and 3Sggg localize almost identically to 1Sg (~97% at promoters), supporting that they are genuine TSS signals with additional non-templated G additions. M-type shows dramatically different distribution (only 70% promoter).
+2Sgg and 3Sggg localize almost identically to 1Sg (about 93 % of reads at cluster-defined promoters, that is, at TSS clusters within 300 bp upstream of a same-strand gene), supporting that they are genuine TSS signals with additional non-templated G additions. M-type shows a dramatically different distribution (only 64 % promoter). Under the earlier −300/+100 annotated window these figures were about 95 % and 65 %.
 
 ---
 
@@ -637,6 +637,10 @@ test/                   synthetic BAMs and reference for pipeline testing
 | `dinuc_dist_method` | euclidean | distance for Stage 7 dinucleotide clustering |
 | `chisq_min_count` | 5 | minimum expected count per chi-square cell |
 | `expr_min_pct_1Sg` | 70 | % 1Sg threshold selecting high-1Sg clusters in Stage 12 |
+| `promoter_upstream` / `promoter_downstream` | 300 / 100 | promoter window around an annotated transcript start (1000 / 100 for human); it labels positions only under `promoter_source: window`, and it always serves the Stage 9 motif selection and the Stage 10 enhancer detection |
+| `promoter_source` | clusters | definition of "Promoter" in Stages 10 and 19: `clusters` (data-derived TSS clusters) or `window` (the default when the key is absent) |
+| `promoter_cluster_windows` | [15, 20, 25, 30, 35, 40] | windows ending strictly upstream of a gene start, tried shortest first; the same-strand TSS clusters overlapping the first window that reaches any cluster are the gene's promoter clusters, and the promoter runs from such a cluster to the gene start |
+| `promoter_target_genes` / `promoter_target_fraction` | [4600, 5000] / 0.9 | estimate of the expressed yeast genes, used by Stage 8 step 13 to report the window length at which the genes with a promoter reach that fraction of each target |
 | `seqarchr_upstream` / `seqarchr_downstream` | 150 / 50 | asymmetric promoter window for Stage 15 |
 | `seqarchr_chunk_size` | 500 | sequences per NMF chunk; an uncollated chunk has exactly this size |
 | `seqarchr_n_arch` | 8 | collation dendrogram cut, chosen from merge heights only |

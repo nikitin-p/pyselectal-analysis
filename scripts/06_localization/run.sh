@@ -48,6 +48,7 @@ $RSCRIPT "$SCRIPT_DIR/01_localization.R" \
     --bam_sel    "$RESULTS_ROOT/bam_selected" \
     --bam_sub    "$RESULTS_ROOT/bam_subsampled" \
     --tss        "$RESULTS_ROOT/tss/tss_clustered.tsv" \
+    --promoters  "$RESULTS_ROOT/tss/promoter_clusters.tsv" \
     --gtf        "$ANNOTATION_GTF" \
     --outdir     "$RESULTS_ROOT/localization" \
     --figdir     "$RESULTS_ROOT/figures" \

@@ -67,10 +67,22 @@ script_dir <- dirname(sub("^--file=", "", grep("^--file=", commandArgs(FALSE),
 source(file.path(script_dir, "exo_helpers.R"))
 source(file.path(script_dir, "..", "utils", "end_types.R"))
 source(file.path(script_dir, "..", "utils", "localization.R"))
+source(file.path(script_dir, "..", "utils", "txdb.R"))
 source(file.path(script_dir, "..", "utils", "plot_helpers.R"))
 
 params <- yaml.load_file(params_f)
-top_n  <- as.integer(params$exo_top_types)
+set_promoter_window(params)
+promoter_cl <- load_promoter_clusters(params, get_arg("--promoters"))
+top_n  <-as.integer(params$exo_top_types)
+# exo_type_set "vocabulary" gives every non-canonical type of END_TYPES_REAL a
+# bar, plus longclip, which the vocabulary cannot name (its clips vary in
+# length) but which is common enough to keep apart from the pooled tail; "top"
+# is the historical rule, the exo_top_types most abundant exotics.
+exo_type_set <- if (is.null(params$exo_type_set)) "top" else params$exo_type_set
+if (!exo_type_set %in% c("vocabulary", "top"))
+  stop("exo_type_set must be 'vocabulary' or 'top', not '", exo_type_set, "'")
+exo_types <- if (exo_type_set == "vocabulary")
+               c(setdiff(END_TYPES_REAL, END_TYPE_CANONICAL), "longclip") else NULL
 
 dir.create(outdir, recursive = TRUE, showWarnings = FALSE)
 dir.create(figdir, recursive = TRUE, showWarnings = FALSE)
@@ -108,7 +120,7 @@ usual <- END_TYPE_CANONICAL
 # ── annotation ────────────────────────────────────────────────────────────────
 
 message("Loading gene annotation: ", gtf_f)
-txdb <- makeTxDbFromGFF(gtf_f, format = "gtf")
+txdb <- make_txdb_from_gff(gtf_f, format = "gtf")
 
 pos_gr <- GRanges(seqnames = owned$chr,
                   ranges   = IRanges(start = owned$pos, width = 1),
@@ -126,7 +138,8 @@ if (!fast_mode && !is.null(enh_f) && nzchar(enh_f) && file.exists(enh_f)) {
 if (fast_mode) {
   message("Using fast mode (TxDb-based annotation)")
   tx <- transcripts(txdb)
-  promoter_gr <- promoters(tx, upstream = PROMOTER_UP, downstream = PROMOTER_DOWN)
+  promoter_gr <- if (is.null(promoter_cl))
+    promoters(tx, upstream = PROMOTER_UP, downstream = PROMOTER_DOWN) else promoter_cl
   utr5_gr <- unlist(fiveUTRsByTranscript(txdb))
   utr3_gr <- unlist(threeUTRsByTranscript(txdb))
   cds_gr <- unlist(cdsBy(txdb, by = "tx"))
@@ -135,7 +148,8 @@ if (fast_mode) {
                                               utr3_gr, cds_gr, intron_gr)]
 } else {
   message("Annotating with ChIPseeker...")
-  owned[, category := annotate_positions_chipseeker(pos_gr, txdb, enhancer_gr)]
+  owned[, category := annotate_positions_chipseeker(pos_gr, txdb, enhancer_gr,
+                                                    promoter_gr = promoter_cl)]
 }
 stopifnot(!anyNA(owned$category))
 
@@ -148,7 +162,7 @@ stopifnot(!anyNA(owned$category))
 # from its own position — so a pooled bar is a sum of correctly located rows
 # rather than a class of its own.
 totals <- owned[type != usual, .(n = sum(n_dom)), by = type][order(-n)]
-keep   <- head(totals$type, top_n)
+keep   <- exotic_bar_types(totals$type, top_n, exo_types)
 owned[, type_label := fifelse(type == usual, usual,
                        fifelse(type %in% keep, type, OTHER_TYPES_LABEL))]
 
@@ -227,7 +241,9 @@ p_bar <- ggplot(plot_dt, aes(x = type_label, y = pct, fill = category)) +
         axis.text.x = element_text(angle = 45, hjust = 1))
 
 fig_f <- file.path(figdir, "22_exo_localization.pdf")
-ggsave(fig_f, p_bar, width = 10, height = 6)
+# The PNG twin is what the Quarto report embeds, since HTML cannot show a PDF.
+for (f in c(fig_f, sub("\\.pdf$", ".png", fig_f)))
+  ggsave(f, p_bar, width = 10, height = 6, dpi = 200, bg = "white")
 message("Written: ", fig_f)
 
 sessionInfo()

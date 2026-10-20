@@ -72,6 +72,32 @@ $RSCRIPT "$SCRIPT_DIR/05_plot_clusters.R" \
     --outdir     "$RESULTS_ROOT/figures" \
     $FORCE_FLAG
 
+# Relative paths in the params file are resolved against the project root.
+ANNOTATION_BED="$(yaml_get annotation_bed "$PARAMS")"
+[[ -n "$ANNOTATION_BED" && "$ANNOTATION_BED" != /* ]] && ANNOTATION_BED="$ROOT_DIR/$ANNOTATION_BED"
+
+if [[ "$(yaml_get promoter_source "$PARAMS")" == "clusters" ]]; then
+    log_info "  step 12: cluster-defined promoters"
+    $RSCRIPT "$SCRIPT_DIR/12_promoter_clusters.R" \
+        --ctss     "$RESULTS_ROOT/tss/typed_ctss.tsv.gz" \
+        --matrix   "$RESULTS_ROOT/tss/tss_matrix.tsv" \
+        --genes    "$ANNOTATION_BED" \
+        --outdir   "$RESULTS_ROOT/tss" \
+        --trackdir "$RESULTS_ROOT/tracks" \
+        --params   "$PARAMS" \
+        $FORCE_FLAG
+
+    log_info "  step 13: promoter window sweep and definition figure"
+    $RSCRIPT "$SCRIPT_DIR/13_promoter_window_sweep.R" \
+        --ctss     "$RESULTS_ROOT/tss/typed_ctss.tsv.gz" \
+        --matrix   "$RESULTS_ROOT/tss/tss_matrix.tsv" \
+        --genes    "$ANNOTATION_BED" \
+        --outdir   "$RESULTS_ROOT/tss" \
+        --figdir   "$RESULTS_ROOT/figures" \
+        --params   "$PARAMS" \
+        $FORCE_FLAG
+fi
+
 log_info "Stage 8+9 complete."
 log_info "  matrix    → results/tss/tss_matrix.tsv"
 log_info "  clustered → results/tss/tss_clustered.tsv"

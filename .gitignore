@@ -21,6 +21,16 @@ config/samples_1Sc.tsv
 config/samples_1St.tsv
 config/samples_M.tsv
 config/samples_other_soft_clipped.tsv
+config/samples_human_1Sa.tsv
+config/samples_human_1Sc.tsv
+config/samples_human_1Sg.tsv
+config/samples_human_1St.tsv
+config/samples_human_2Sga.tsv
+config/samples_human_2Sgg.tsv
+config/samples_human_2Stg.tsv
+config/samples_human_3Sggg.tsv
+config/samples_human_M.tsv
+config/samples_human_first.tsv
 Rplots.pdf
 config/samples_S.tsv
 reports/
@@ -29,3 +39,4 @@ TODO.md
 .claude/
 download_human_figures.sh
 results_human/
+gene_list/

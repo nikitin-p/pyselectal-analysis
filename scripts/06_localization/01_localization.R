@@ -81,6 +81,12 @@ samples <- read_tsv(samples_f, show_col_types = FALSE) %>%
 # palette and both annotation functions are shared with Stage 19 step 4 —
 # see scripts/utils/localization.R.
 source(file.path(dirname(.end_types_path), "localization.R"))
+set_promoter_window(params)
+# NULL under promoter_source "window"; under "clusters" these regions replace
+# the window as the Promoter category. The enhancer detection below keeps using
+# the annotated window, because it excludes regions rather than labelling them.
+promoter_cl <- load_promoter_clusters(params, get_arg("--promoters"))
+source(file.path(dirname(.end_types_path), "txdb.R"))
 
 BALANCE_THRESHOLD <- 0.95
 
@@ -98,12 +104,13 @@ if (!fast_mode) {
 
 # ── Load TxDb ─────────────────────────────────────────────────────────────────
 message("Loading gene annotation: ", gtf_f)
-txdb <- makeTxDbFromGFF(gtf_f, format = "gtf")
+txdb <- make_txdb_from_gff(gtf_f, format = "gtf")
 
 if (fast_mode) {
   message("Building annotation layers for fast mode...")
   tx <- transcripts(txdb)
-  promoter_gr <- promoters(tx, upstream = PROMOTER_UP, downstream = PROMOTER_DOWN)
+  promoter_gr <- if (is.null(promoter_cl))
+    promoters(tx, upstream = PROMOTER_UP, downstream = PROMOTER_DOWN) else promoter_cl
   utr5_gr <- unlist(fiveUTRsByTranscript(txdb))
   utr3_gr <- unlist(threeUTRsByTranscript(txdb))
   cds_gr <- unlist(cdsBy(txdb, by = "tx"))
@@ -304,7 +311,8 @@ for (i in seq_len(nrow(samples))) {
     if (fast_mode) {
       category <- annotate_positions_fast(pos_gr, promoter_gr, utr5_gr, utr3_gr, cds_gr, intron_gr)
     } else {
-      category <- annotate_positions_chipseeker(pos_gr, txdb, enhancer_gr)
+      category <- annotate_positions_chipseeker(pos_gr, txdb, enhancer_gr,
+                                                promoter_gr = promoter_cl)
     }
 
     # Aggregate counts

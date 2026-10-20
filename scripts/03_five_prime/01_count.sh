@@ -2,7 +2,13 @@
 # Stage 3, step 1: run pyselectal --count on every BAM in the sample manifest.
 #
 # Usage:
-#   bash scripts/03_five_prime/01_count.sh [--samples FILE] [--outdir DIR] [--force]
+#   bash scripts/03_five_prime/01_count.sh [--samples FILE] [--outdir DIR] \
+#       [--collapse PCT] [--force]
+#
+# --collapse overrides collapse_threshold from the params file. Passing 0 keeps
+# every type separate, which the fine-vocabulary heatmap needs: at the default a
+# rare type is folded into other_* in some libraries but not in others, and the
+# M reads whose mapped prefix is rare are reported as other_mapped rather than M.
 #
 # Defaults:
 #   --samples  config/samples.tsv
@@ -20,6 +26,7 @@ source "$ROOT_DIR/scripts/utils/parse_yaml.sh"
 PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 OUTDIR=""
+COLLAPSE=""
 FORCE=0
 
 while [[ $# -gt 0 ]]; do
@@ -27,6 +34,7 @@ while [[ $# -gt 0 ]]; do
         --samples) SAMPLES="$2"; shift 2 ;;
         --params)  PARAMS="$2";  shift 2 ;;
         --outdir)  OUTDIR="$2";  shift 2 ;;
+        --collapse) COLLAPSE="$2"; shift 2 ;;
         --force)   FORCE=1;      shift   ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -34,7 +42,7 @@ done
 
 PYSELECTAL="$(yaml_get pyselectal "$PARAMS")"
 CONDA_ENV="$(yaml_get conda_env_pyselectal "$PARAMS")"
-COLLAPSE="$(yaml_get collapse_threshold "$PARAMS")"
+[[ -z "$COLLAPSE" ]] && COLLAPSE="$(yaml_get collapse_threshold "$PARAMS")"
 MAPPED_PFX="$(yaml_get mapped_prefix "$PARAMS")"
 [[ -z "$OUTDIR" ]] && OUTDIR="$(yaml_get results_five_prime "$PARAMS")"
 [[ "$OUTDIR" != /* ]] && OUTDIR="$ROOT_DIR/$OUTDIR"

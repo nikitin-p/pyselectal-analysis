@@ -36,6 +36,7 @@ force     <- "--force" %in% args
 params    <- yaml.load_file(params_f)
 fdr       <- as.numeric(params$a8_fdr)
 bg_plat   <- as.integer(params$a8_bg_plateau)
+bg_prox   <- as.integer(params$a8_bg_proximal)
 min_reads <- as.integer(params$a8_min_type_reads)
 
 dir.create(figdir, recursive = TRUE, showWarnings = FALSE)
@@ -101,7 +102,8 @@ bubble <- function(dt, order_col, decreasing, fname, subtitle) {
 }
 
 bubble(prim, "neg_log10_q", TRUE, "19_a8_bubble_by_q.pdf",
-       paste0("position-weighted, background ", min(bg_plat), "..", max(bg_plat),
+       paste0("position-weighted, background ", min(bg_prox), "..", max(bg_prox),
+              " excluding -8",
               ", membership >= ", min_reads, " alignments; ",
               "fill: red = enriched, blue = depleted; ",
               "thick outline = bootstrap CI excludes 0\n",
@@ -123,7 +125,8 @@ pp <- ggplot(prof[coord < 0], aes(coord, pct_A)) +
   labs(x = "position relative to the CTSS (+1 = first transcribed base)",
        y = "A frequency (%), position-weighted",
        title = "Per-position A frequency around the CTSS",
-       subtitle = "red = position -8; the flat -20..-11 stretch is the frozen background") +
+       subtitle = paste0("red = position -8; the background is the proximal ",
+                         min(bg_prox), "..", max(bg_prox), " stretch, -8 excluded")) +
   theme_bw(base_size = 9)
 ggsave(file.path(figdir, "19_a8_profile.pdf"), pp, width = 10, height = 6)
 
@@ -140,7 +143,10 @@ ps <- ggplot(sens, aes(primary, log2fc)) +
   labs(x = expression(log[2]*FC~", primary configuration"),
        y = expression(log[2]*FC~", sensitivity configuration"),
        title = "Sensitivity of the effect size to the three fixed choices",
-       subtitle = "bg_proximal = background -2..-7 and -9; w_reads = alignment-weighted; member_1 = 1-alignment membership") +
+       subtitle = paste0("bg_plateau = distal background ", min(bg_plat), "..",
+                         max(bg_plat), " instead of the proximal one; ",
+                         "w_reads = alignment-weighted; ",
+                         "member_1 = 1-alignment membership")) +
   theme_bw(base_size = 9)
 ggsave(file.path(figdir, "19_a8_sensitivity.pdf"), ps, width = 9, height = 3.6)
 

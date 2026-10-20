@@ -14,12 +14,18 @@
 #   1. Re-run the Stage 17 dominance cascade with the CTSS position as the unit,
 #      at this stage's own depth floor (exo_min_depth)
 #   2. Tally every type by category and draw the composite figure
-#   3. Build one genomic-context sequence motif per dominating type
+#   3. Build the genomic-context sequence motifs: two alignment-weighted logos
+#      per type, under each of the two dominance-group schemes, plus the
+#      per-dominating-type difference against the canonical type
 #   4. Annotate the dominated positions and draw their genomic localization
+#   5. Test A at -8 over the same positions step 3 draws its logos from, one
+#      bubble row per <end type, dominance group> pair
+#   6. Annotate every position a type occurs at and draw its genomic
+#      localization split by the dominance category of the position
 #
-# Step 3 reads the genome FASTA named by the sample sheet and step 4 reads the
-# annotation GTF; those are the only references this stage opens, and no BAM is
-# read at any step. Step 4 also reuses Stage 10's enhancer BED when it exists,
+# Steps 3 and 5 read the genome FASTA named by the sample sheet and steps 4 and 6
+# read the annotation GTF; those are the only references this stage opens, and no BAM is
+# read at any step. Steps 4 and 6 also reuse Stage 10's enhancer BED when it exists,
 # because detecting enhancers would require the BAMs.
 #
 # This stage reads Stage 17's tables only. Run scripts/10_dominant_endtype/run.sh
@@ -68,6 +74,7 @@ resolve_path() {
 }
 ANNOTATION_GTF="$(resolve_path "$(yaml_get annotation_gtf "$PARAMS")")"
 LOC_DIR="$ROOT_DIR/$(yaml_get results_root "$PARAMS")/localization"
+PROMOTERS="$ROOT_DIR/$(yaml_get results_root "$PARAMS")/tss/promoter_clusters.tsv"
 
 DOM_DIR="$ROOT_DIR/$(yaml_get results_dominance "$PARAMS")"
 EXO_DIR="$ROOT_DIR/$(yaml_get results_exotic_origins "$PARAMS")"
@@ -94,9 +101,10 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/02_origins_figure.R" \
     --figdir         "$FIG_DIR" \
     --params         "$PARAMS" $FORCE_FLAG
 
-log_info "  step 3: genomic context motifs per dominating type"
+log_info "  step 3: genomic context motifs by end type and dominance group"
 log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/03_context_motifs.R" \
     --dominance "$EXO_DIR/position_dominance.tsv.gz" \
+    --ctss      "$DOM_DIR/fine_typed_ctss.tsv.gz" \
     --samples   "$SAMPLES" \
     --outdir    "$EXO_DIR" \
     --figdir    "$FIG_DIR" \
@@ -107,6 +115,27 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/04_dominated_localization.R" \
     --dominance "$EXO_DIR/position_dominance.tsv.gz" \
     --gtf       "$ANNOTATION_GTF" \
     --enhancers "$LOC_DIR/enhancer_regions.bed" \
+    --promoters "$PROMOTERS" \
+    --outdir    "$EXO_DIR" \
+    --figdir    "$FIG_DIR" \
+    --params    "$PARAMS" $FORCE_FLAG
+
+log_info "  step 5: A-8 enrichment by end type and dominance group"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/05_a8_by_dominating_type.R" \
+    --dominance "$EXO_DIR/position_dominance.tsv.gz" \
+    --ctss      "$DOM_DIR/fine_typed_ctss.tsv.gz" \
+    --samples   "$SAMPLES" \
+    --outdir    "$EXO_DIR" \
+    --figdir    "$FIG_DIR" \
+    --params    "$PARAMS" $FORCE_FLAG
+
+log_info "  step 6: genomic localization of every position, by dominance category"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/06_localization_by_category.R" \
+    --dominance "$EXO_DIR/position_dominance.tsv.gz" \
+    --ctss      "$DOM_DIR/fine_typed_ctss.tsv.gz" \
+    --gtf       "$ANNOTATION_GTF" \
+    --enhancers "$LOC_DIR/enhancer_regions.bed" \
+    --promoters "$PROMOTERS" \
     --outdir    "$EXO_DIR" \
     --figdir    "$FIG_DIR" \
     --params    "$PARAMS" $FORCE_FLAG
@@ -115,5 +144,9 @@ log_info "Stage 19 complete."
 log_info "  tables  → $EXO_DIR"
 log_info "  figures → $FIG_DIR/20_exo_origins.pdf"
 log_info "            $FIG_DIR/21_exo_context_logos.pdf"
+log_info "            $FIG_DIR/21_exo_context_logos_self.pdf"
 log_info "            $FIG_DIR/21_exo_context_delta.pdf"
 log_info "            $FIG_DIR/22_exo_localization.pdf"
+log_info "            $FIG_DIR/22_exo_localization_by_category.pdf"
+log_info "            $FIG_DIR/23_exo_a8_bubble_by_q.pdf"
+log_info "            $FIG_DIR/23_exo_a8_bubble_by_q_self.pdf"

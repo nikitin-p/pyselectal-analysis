@@ -102,7 +102,18 @@ classify_category <- function(call, type, usual = "1Sg") {
 # is still drawn somewhere. Categories are always computed from the row's own
 # fine type, never from its bar label, so a pooled bar is a sum of correctly
 # classified rows rather than a class of its own.
+# The exotic types that get a bar of their own, in descending order of
+# alignment count (`ranked`). With `types` NULL these are the top_n types by
+# count; otherwise they are the members of `types` that occur at all, which is
+# how a fixed vocabulary is drawn whatever its members' ranks. Everything not
+# kept pools into the "other" bar either way.
+exotic_bar_types <- function(ranked, top_n = 12L, types = NULL) {
+  ranked <- as.character(ranked)
+  if (is.null(types)) utils::head(ranked, top_n) else intersect(ranked, types)
+}
+
 exotic_tallies <- function(pooled, call_map, usual = "1Sg", top_n = 12L,
+                           types = NULL,
                            all_label = ALL_EXOTICS_LABEL,
                            other_label = OTHER_TYPES_LABEL) {
   stopifnot(all(c("position_id", "type", "n") %in% names(pooled)))
@@ -120,7 +131,7 @@ exotic_tallies <- function(pooled, call_map, usual = "1Sg", top_n = 12L,
 
   ex <- d[!type %in% usual, .(position_id, type, n, category)]
   totals <- ex[, .(n = sum(n)), by = type][order(-n)]
-  keep   <- utils::head(totals$type, top_n)
+  keep   <- exotic_bar_types(totals$type, top_n, types)
   ex[, type_label := data.table::fifelse(type %in% keep, as.character(type),
                                          other_label)]
 
@@ -231,4 +242,78 @@ thin_by_group <- function(dt, group_col, cap, seed = 42L) {
   set.seed(seed)
   dt[, .SD[if (.N <= cap) seq_len(.N) else sample.int(.N, cap)],
      by = c(group_col)]
+}
+
+# ── the column splits the context logos and the A-8 bubbles are drawn by ──────
+#
+# The four categories above are the right vocabulary for a stacked bar, where
+# every class is drawn at once. A sequence logo cannot stack: it needs one set
+# of windows per column to contrast, so the four categories are merged down to
+# two or three. Three merges are meaningful, and each answers a different
+# question about the same type:
+#
+#   "sg"    the canonical type is the splitter. Group A is the positions the
+#           canonical type dominates, group B is everything else callable --
+#           self_dom and other_dom merged. This asks whether the type's reads
+#           at canonical start sites sit in a different genomic context from
+#           its reads anywhere else, which is the contaminant question;
+#   "self"  the type itself is the splitter. Group A is the positions the type
+#           dominates, group B is Sg_dom and other_dom merged. This asks
+#           whether a type's OWN sites look different from the sites where it
+#           is a minority end, which is the ownership question;
+#   "self3" the same ownership question with group B taken apart again, into
+#           the positions the canonical type dominates and the positions where
+#           a third type does or nothing does. Merging those two hides the
+#           distinction the whole stage is about: a minority end AT A CANONICAL
+#           START SITE is the contaminant reading, while a minority end at a
+#           site some third type owns is not, and they need not share a motif.
+#           This is the "self" scheme with its right column split, and it is
+#           what the self figure draws.
+#
+# For the canonical type the schemes collapse: its self_dom and Sg_dom classes
+# are the same set by construction, so under "sg" and "self" its row is
+# identical in both figures, and under "self3" its middle column is empty and
+# is drawn as a blank placeholder to keep the grid aligned.
+#
+# below_floor positions take part in none of them: they are not callable, so
+# they cannot be said to be dominated by anything, and folding them into the
+# last group would mix "not dominated" with "not testable".
+LOGO_SCHEMES <- c("sg", "self")
+
+# The group labels of a scheme, in drawing order -- one per column of the
+# figure. `usual` is the canonical type's name, passed in rather than hardcoded
+# so that the vocabulary stays in end_types.R.
+group_labels <- function(scheme, usual) {
+  switch(scheme,
+    sg    = c(A = paste0(usual, " dominates the position"),
+              B = paste0(usual, " does not dominate the position")),
+    self  = c(A = "this end type dominates the position",
+              B = "another type dominates, or none does"),
+    self3 = c(A = "this end type dominates the position",
+              B = paste0(usual, " dominates the position"),
+              C = "a third type dominates, or none does"),
+    stop("unknown scheme: ", scheme))
+}
+
+# The group of each (type, position) pair under a scheme, as a factor over that
+# scheme's groups in drawing order. `call` must already be free of below_floor,
+# which the caller drops as a set.
+#
+# The self3 branch is a priority cascade rather than a set of independent
+# tests: self wins over Sg, so the canonical type's own positions land in A and
+# its B column stays empty, exactly as classify_category() resolves the same
+# collision for the bar plot.
+assign_group <- function(call, type, scheme, usual) {
+  stopifnot(length(call) == length(type))
+  if (any(call == "below_floor")) {
+    stop("below_floor positions reached assign_group(); they belong to ",
+         "neither group and must be dropped before the split.")
+  }
+  levs <- names(group_labels(scheme, usual))
+  g <- switch(scheme,
+    sg    = ifelse(call == usual[1], "A", "B"),
+    self  = ifelse(call == type,     "A", "B"),
+    self3 = ifelse(call == type, "A", ifelse(call == usual[1], "B", "C")),
+    stop("unknown scheme: ", scheme))
+  factor(g, levels = levs)
 }

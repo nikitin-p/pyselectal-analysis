@@ -21,6 +21,7 @@
 
 suppressPackageStartupMessages({
   library(GenomicRanges)
+  library(GenomeInfoDb)
   library(GenomicFeatures)
   library(Biostrings)
   library(Rsamtools)
@@ -38,6 +39,7 @@ suppressPackageStartupMessages({
 else "scripts/utils/end_types.R")
 if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
 source(.end_types_path)
+source(file.path(dirname(.end_types_path), "txdb.R"))
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -168,7 +170,7 @@ genome <- load_genome(genome_spec)
 # ── optionally filter to promoters ────────────────────────────────────────────
 if (promoter_only) {
   message("\nFiltering to promoter regions...")
-  txdb <- makeTxDbFromGFF(gtf_f, format = "gtf")
+  txdb <- make_txdb_from_gff(gtf_f, format = "gtf")
   tx <- transcripts(txdb)
   promoter_gr <- reduce(promoters(tx, upstream = 1000, downstream = 100))
 

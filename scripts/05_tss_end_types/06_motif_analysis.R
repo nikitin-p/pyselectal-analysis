@@ -20,6 +20,7 @@
 
 suppressPackageStartupMessages({
   library(GenomicRanges)
+  library(GenomeInfoDb)
   library(GenomicFeatures)
   library(Biostrings)
   library(Rsamtools)
@@ -37,6 +38,7 @@ suppressPackageStartupMessages({
 else "scripts/utils/end_types.R")
 if (!file.exists(.end_types_path)) .end_types_path <- "scripts/utils/end_types.R"
 source(.end_types_path)
+source(file.path(dirname(.end_types_path), "txdb.R"))
 
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -213,10 +215,11 @@ message("  after min_reads filter (>=", min_reads, "): ", nrow(tss_yr))
 
 # ── load TxDb for promoter annotation ─────────────────────────────────────────
 message("Loading gene annotation: ", gtf_f)
-txdb <- makeTxDbFromGFF(gtf_f, format = "gtf")
+txdb <- make_txdb_from_gff(gtf_f, format = "gtf")
 
-PROMOTER_UP <- 1000L
-PROMOTER_DOWN <- 100L
+# The window is the one Stages 10 and 19 use — see scripts/utils/localization.R.
+source(file.path(dirname(.end_types_path), "localization.R"))
+set_promoter_window(params)
 tx <- transcripts(txdb)
 promoter_gr <- reduce(promoters(tx, upstream = PROMOTER_UP, downstream = PROMOTER_DOWN))
 message("  promoter regions: ", length(promoter_gr))

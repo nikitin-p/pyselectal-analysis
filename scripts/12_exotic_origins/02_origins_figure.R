@@ -75,6 +75,15 @@ source(file.path(script_dir, "..", "utils", "end_types.R"))
 
 params    <- yaml.load_file(params_f)
 top_n     <- as.integer(params$exo_top_types)
+# exo_type_set "vocabulary" gives every non-canonical type of END_TYPES_REAL a
+# bar, plus longclip, which the vocabulary cannot name (its clips vary in
+# length) but which is common enough to keep apart from the pooled tail; "top"
+# is the historical rule, the exo_top_types most abundant exotics.
+exo_type_set <- if (is.null(params$exo_type_set)) "top" else params$exo_type_set
+if (!exo_type_set %in% c("vocabulary", "top"))
+  stop("exo_type_set must be 'vocabulary' or 'top', not '", exo_type_set, "'")
+exo_types <- if (exo_type_set == "vocabulary")
+               c(setdiff(END_TYPES_REAL, END_TYPE_CANONICAL), "longclip") else NULL
 point_cap <- as.integer(params$exo_point_cap)
 seed      <- as.integer(params$exo_seed)
 min_total <- as.integer(params$dom_min_total)
@@ -100,7 +109,8 @@ cmap <- dom[, .(position_id, call = as.character(call))]
 stopifnot(!anyNA(cmap$call))
 
 usual <- END_TYPE_CANONICAL   # the canonical class; "exotic" means everything else
-tal   <- exotic_tallies(pooled, cmap, usual = usual, top_n = top_n)
+tal   <- exotic_tallies(pooled, cmap, usual = usual, top_n = top_n,
+                        types = exo_types)
 
 # The bars of the rainclouds are the bars of panel A: the reference type and
 # every exotic type drawn individually, with the pooled tail kept pooled.
@@ -197,10 +207,15 @@ CATEGORY_COLS <- c(Sg_dom      = "#1f78b4",
 
 tal[, measure_lab := factor(measure, levels = c("alignments", "positions"),
                             labels = c("aln", "pos"))]
-bar_tot <- tal[, .(total = sum(count)), by = .(type_label, measure_lab)]
+# The pooled tail is not drawn. It mixes clips of different lengths and bases,
+# so its bar and its raincloud describe no end type; its reads are still in the
+# tables above and in the "All exotics" bar, which counts every exotic read.
+tal_plot <- tal[type_label != OTHER_TYPES_LABEL]
+tal_plot[, type_label := droplevels(type_label)]
+bar_tot <- tal_plot[, .(total = sum(count)), by = .(type_label, measure_lab)]
 fmt_n <- function(x) formatC(x, format = "d", big.mark = " ")
 
-pA <- ggplot(tal, aes(measure_lab, count, fill = category)) +
+pA <- ggplot(tal_plot, aes(measure_lab, count, fill = category)) +
   geom_col(position = "fill", width = 0.75) +
   geom_text(data = bar_tot, inherit.aes = FALSE,
             aes(measure_lab, 1.03, label = fmt_n(total)),
@@ -225,7 +240,8 @@ pA <- ggplot(tal, aes(measure_lab, count, fill = category)) +
          "fine type other than ", usual, ", so M is included. The left bar of ",
          "each pair\ncounts alignments and the right counts the distinct CTSS ",
          "positions; totals are printed above. A position\nis assessed for ",
-         "dominance only from ", min_depth, " pooled reads upwards.")) +
+         "dominance only from ", min_depth, " pooled reads upwards. Exotic types ",
+         "without a bar of their own\nare counted in All exotics only.")) +
   theme_classic(base_size = 9) +
   theme(panel.spacing.x = unit(1.5, "pt"),
         strip.background = element_blank(),
@@ -237,6 +253,9 @@ pA <- ggplot(tal, aes(measure_lab, count, fill = category)) +
 
 # Types outside the shared vocabulary (long or rare clips, and the pooled tail)
 # have no colour of their own and are drawn grey.
+expr_plot <- expr[type != OTHER_TYPES_LABEL]
+row_ord   <- setdiff(row_ord, OTHER_TYPES_LABEL)
+expr_plot[, type := factor(as.character(type), levels = row_ord)]
 row_cols <- END_TYPE_COLORS_BRIGHT[row_ord]
 names(row_cols) <- row_ord
 row_cols[is.na(row_cols)] <- "#adb5bd"
@@ -278,15 +297,22 @@ raincloud <- function(dt, value_col, title, xlab) {
     theme_bw(base_size = 9)
 }
 
-pB <- raincloud(expr, "own_depth",
+pB <- raincloud(expr_plot, "own_depth",
                 "B  Positions each type dominates: that type's own reads",
                 expression(log[10]~"alignments of this type at the position"))
-pC <- raincloud(expr, "total_depth",
+pC <- raincloud(expr_plot, "total_depth",
                 "C  The same positions, every end type pooled",
                 expression(log[10]~"pooled alignments at the position"))
 
 p <- pA / pB / pC + plot_layout(heights = c(1.35, 1, 1))
-ggsave(file.path(figdir, "20_exo_origins.pdf"), p, width = 11, height = 13)
+# The PNG twin is what the Quarto report embeds, since HTML cannot show a PDF.
+for (ext in c("pdf", "png"))
+  ggsave(file.path(figdir, paste0("20_exo_origins.", ext)), p,
+         width = 11, height = 13, dpi = 200, bg = "white")
+# Panel A alone, which is the part of this figure the report tells its story with.
+for (ext in c("pdf", "png"))
+  ggsave(file.path(figdir, paste0("20_exo_origins_A.", ext)), pA,
+         width = 11, height = 5.5, dpi = 200, bg = "white")
 message("Written: ", file.path(figdir, "20_exo_origins.pdf"))
 
 # The tables are the sentinel, so the figure is written first: a failing ggsave

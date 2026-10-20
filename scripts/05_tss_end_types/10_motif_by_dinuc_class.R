@@ -90,6 +90,7 @@
 
 suppressPackageStartupMessages({
   library(GenomicRanges)
+  library(GenomeInfoDb)
   library(Biostrings)
   library(Rsamtools)
   library(data.table)

@@ -3,8 +3,9 @@
 # pair's own upstream background, and bootstrap the effect size over clusters.
 #
 # Four configurations are emitted. The primary is position-weighted with the
-# -20..-11 background and a 2-read membership rule; the other three vary exactly
-# one of those three choices, and each is BH-corrected on its own.
+# proximal -10..-2 background (minus -8 itself) and a 2-read membership rule;
+# the other three vary exactly one of those three choices, and each is
+# BH-corrected on its own.
 #
 # Usage:
 #   Rscript scripts/11_a8_saturation/02_a8_test.R \
@@ -51,10 +52,10 @@ win <- fread(win_f)
 # config, background column, number of background positions, weighting,
 # membership threshold, and whether to bootstrap.
 CONFIGS <- list(
-  primary     = list(bg = "n_a_plateau",  k = n_plat, w = "positions", m = min_reads, boot = TRUE),
-  bg_proximal = list(bg = "n_a_proximal", k = n_prox, w = "positions", m = min_reads, boot = FALSE),
-  w_reads     = list(bg = "n_a_plateau",  k = n_plat, w = "reads",     m = min_reads, boot = FALSE),
-  member_1    = list(bg = "n_a_plateau",  k = n_plat, w = "positions", m = 1L,        boot = FALSE)
+  primary     = list(bg = "n_a_proximal", k = n_prox, w = "positions", m = min_reads, boot = TRUE),
+  bg_plateau  = list(bg = "n_a_plateau",  k = n_plat, w = "positions", m = min_reads, boot = FALSE),
+  w_reads     = list(bg = "n_a_proximal", k = n_prox, w = "reads",     m = min_reads, boot = FALSE),
+  member_1    = list(bg = "n_a_proximal", k = n_prox, w = "positions", m = 1L,        boot = FALSE)
 )
 
 grid <- as.data.table(expand.grid(end_type = A8_TYPES, dinuc = A8_DINUCS,
