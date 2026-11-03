@@ -187,7 +187,7 @@ otherwise the slippage signal swamps it.
 
 ## Analysis plan
 
-1. Download the 12 priority-1 runs on the VM (`data/nad_captureseq/`), and add the 36 priority-2 runs only if step 5 gives a signal.
+1. Download the 12 priority-1 runs on the vavilov cluster into `nad/data/nad_captureseq/` with `nad/scripts/00_download/download.sh`, which reads the run list, ENA md5 sums and URLs from `nad/scripts/00_download/priority1_runs.tsv`, and add the 36 priority-2 runs only if step 5 gives a signal.
 2. Strip the 3′ adapter with its UMI, strip the leading G run, keep reads of at least 18 nt (the authors' threshold for genome mapping), and record the length of the removed G run for each read.
 3. Map to sacCer3 with STAR, forcing end-to-end alignment at the 5′ end (`--alignEndsType Extend5pOfRead1`) so that the first aligned base is the RNA 5′ end, and keep MAPQ 255 as in Stage 1.
 4. Count strand-aware 5′ ends per position, per replicate and separately for S and N, call positions or `distclu` clusters enriched in S over N with DESeq2, and require a genomic A at +1. A `YAAG` logo should reappear among the top triple-mutant calls and serves as the positive control for the pipeline.
