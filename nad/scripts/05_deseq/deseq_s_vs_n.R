@@ -149,7 +149,13 @@ for (st in unique(man$strain)) {
                         fracA_tested   = mean(base_p1 == "A"),
                         fracA_enriched = mean(base_p1[enriched] == "A"),
                         fracYAAG_tested_A   = mean(is_yaag(ctx[base_p1 == "A" & !is.na(ctx)])),
-                        fracYAAG_enriched_A = mean(is_yaag(ctx[enriched & base_p1 == "A" & !is.na(ctx)]))),
+                        fracYAAG_enriched_A = mean(is_yaag(ctx[enriched & base_p1 == "A" & !is.na(ctx)])),
+                        # Most tested unmasked positions turn out enriched, so
+                        # "tested" is nearly the enriched set itself; the
+                        # non-enriched positions are the informative contrast.
+                        nonenriched    = sum(!enriched),
+                        fracA_nonenriched = mean(base_p1[!enriched] == "A"),
+                        fracYAAG_nonenriched_A = mean(is_yaag(ctx[!enriched & base_p1 == "A" & !is.na(ctx)]))),
                     by = class][, strain := st]
 
   u <- out[class == "unmasked"]
@@ -188,11 +194,13 @@ u <- summ[class == "unmasked"]
 for (st in mut) {
   r <- u[strain == st]; w <- u[strain == "WT"]
   checks <- c(
-    sprintf("A share at +1 enriched > tested: %.3f vs %.3f", r$fracA_enriched, r$fracA_tested),
-    sprintf("YAAG among A-starts enriched > tested: %.3f vs %.3f", r$fracYAAG_enriched_A, r$fracYAAG_tested_A),
+    sprintf("A share at +1 enriched > non-enriched: %.3f vs %.3f (tested %.3f)",
+            r$fracA_enriched, r$fracA_nonenriched, r$fracA_tested),
+    sprintf("YAAG among A-starts enriched > non-enriched: %.3f vs %.3f (tested %.3f)",
+            r$fracYAAG_enriched_A, r$fracYAAG_nonenriched_A, r$fracYAAG_tested_A),
     sprintf("enriched unmasked positions %s > WT: %d vs %d", st, r$enriched, w$enriched))
-  pass <- c(isTRUE(r$fracA_enriched > r$fracA_tested),
-            isTRUE(r$fracYAAG_enriched_A > r$fracYAAG_tested_A),
+  pass <- c(isTRUE(r$fracA_enriched > r$fracA_nonenriched),
+            isTRUE(r$fracYAAG_enriched_A > r$fracYAAG_nonenriched_A),
             isTRUE(r$enriched > w$enriched))
   for (k in seq_along(checks)) msg("[%s] %s", if (pass[k]) "PASS" else "FAIL", checks[k])
 }
