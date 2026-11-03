@@ -57,8 +57,10 @@ msg("mask: %d genes (%s)", nrow(mask),
     paste(sprintf("%s %d", names(table(mask$biotype)), table(mask$biotype)), collapse = ", "))
 
 # ── inputs ───────────────────────────────────────────────────────────────────
-man <- fread(opt$manifest)[, .(run, strain, library, replicate)]
-mat <- fread(opt$matrix)
+man <- fread(opt$manifest, select = c("run", "strain", "library", "replicate"))
+# Decompress through gzip: fread reads .gz files itself only with R.utils,
+# which r_nad does not have.
+mat <- fread(cmd = sprintf("gzip -dcf '%s'", opt$matrix))
 stopifnot(all(man$run %in% names(mat)))
 msg("matrix: %d positions x %d runs", nrow(mat), nrow(man))
 
