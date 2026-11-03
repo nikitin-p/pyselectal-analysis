@@ -18,6 +18,7 @@ conda_env_star:       "star"         # conda env that has STAR
 conda_env_tools:      "tools"        # conda env that has samtools and other CLI tools
 conda_env_pyselectal: "pysam"        # conda env that has pyselectal dependencies (pysam)
 conda_env_r:          "r_cage"       # conda env that has R and Bioconductor packages
+conda_env_r_nad:      "r_nad"        # NAD step 5 (DESeq2), envs/r_nad.yml, on vavilov
 results_bam:           "results/bam"
 results_bam_sub:       "results/bam_subsampled"
 results_five_prime:    "results/five_prime"

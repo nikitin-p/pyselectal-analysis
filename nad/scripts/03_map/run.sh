@@ -102,14 +102,18 @@ done
 
 # ── summary ───────────────────────────────────────────────────────────────────
 {
-    printf "run\tinput_reads\tunique\tunique_pct\tmulti_pct\ttoo_short_pct\n"
+    printf "run\tinput_reads\tunique\tunique_pct\tmulti_pct\ttoo_many_loci_pct\tmismatch_pct\ttoo_short_pct\tother_pct\n"
     tail -n +2 "$MANIFEST" | cut -f1 | while read -r run; do
         f="$RES_DIR/$run.Log.final.out"; [[ -s "$f" ]] || continue
         g() { grep "$1" "$f" | head -1 | awk -F'|' '{gsub(/[ \t]/,"",$2); print $2}'; }
-        printf "%s\t%s\t%s\t%s\t%s\t%s\n" "$run" \
+        # With --outFilterMultimapNmax 1 every multimapper lands in "too many
+        # loci", so multi_pct is always 0 and the loss shows up in that column.
+        printf "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n" "$run" \
             "$(g 'Number of input reads')" "$(g 'Uniquely mapped reads number')" \
             "$(g 'Uniquely mapped reads %')" "$(g '% of reads mapped to multiple loci')" \
-            "$(g '% of reads unmapped: too short')"
+            "$(g '% of reads mapped to too many loci')" \
+            "$(g '% of reads unmapped: too many mismatches')" \
+            "$(g '% of reads unmapped: too short')" "$(g '% of reads unmapped: other')"
     done
 } > "$RES_DIR/summary.tsv"
 column -t "$RES_DIR/summary.tsv"

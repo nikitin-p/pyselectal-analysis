@@ -1,0 +1,13 @@
+# NAD branch step 5 (nad/scripts/05_deseq): DESeq2 S-vs-N enrichment.
+# conda env create -f envs/r_nad.yml
+name: r_nad
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - r-base=4.4
+  - bioconductor-deseq2
+  - bioconductor-biostrings
+  - r-data.table
+  - r-ggplot2
+  - r-optparse
