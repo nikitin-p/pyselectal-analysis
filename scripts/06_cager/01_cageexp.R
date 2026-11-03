@@ -1,6 +1,7 @@
 #!/usr/bin/env Rscript
 # Stage 10 step 1: build CAGEexp from typed_ctss.tsv.gz, normalize (powerLaw),
-# filter low-expression CTSSs, cluster with distclu, compute IQW.
+# filter low-expression CTSSs, cluster with distclu, compute IQW, and aggregate
+# the per-sample tag clusters into consensus clusters.
 # Saves a CAGEexp RDS and a per-sample tag cluster TSV for downstream use.
 #
 # Usage (from project root):
@@ -61,15 +62,20 @@ max_dist        <- as.integer(params$cager_max_dist        %||% 20)
 keep_singletons <- as.integer(params$cager_keep_singletons_above %||% 5)
 iq_low          <- as.numeric(params$cager_iqw_qlow        %||% 0.1)
 iq_up           <- as.numeric(params$cager_iqw_qup         %||% 0.9)
+cons_tpm        <- as.numeric(params$cager_consensus_tpm_threshold %||% 5)
+cons_max_dist   <- as.integer(params$cager_consensus_max_dist      %||% 100)
+pass_samples    <- as.integer(params$cager_tpm_pass_samples        %||% 1)
 
 message("Stage 10 step 1: build CAGEexp")
 message("  distclu maxDist=", max_dist,
         "  keepSingletonsAbove=", keep_singletons,
-        "  TPM filter=", tpm_threshold)
+        "  TPM filter=", tpm_threshold, " in >= ", pass_samples, " sample(s)")
 
 # ── load + aggregate CTSS ─────────────────────────────────────────────────────
 message("  loading: ", ctss_f)
-ctss <- fread(cmd = paste("zcat", shQuote(ctss_f)))
+# fread decompresses .gz itself; piping through zcat fails on macOS, whose
+# zcat expects .Z files.
+ctss <- fread(ctss_f)
 message("  rows: ", nrow(ctss))
 
 # Sum typed counts to total per (chr, pos, strand, sample)
@@ -112,7 +118,7 @@ ce <- normalizeTagCount(ce, method = "powerLaw", T = 1e6)
 message("  filtering low-expression CTSSs (TPM >= ", tpm_threshold, ")...")
 ce <- filterLowExpCTSS(ce,
                        thresholdIsTpm    = TRUE,
-                       nrPassThreshold   = 1,
+                       nrPassThreshold   = pass_samples,
                        threshold         = tpm_threshold)
 
 # ── cluster ───────────────────────────────────────────────────────────────────
@@ -144,6 +150,20 @@ message("  quantile positions (qLow=", iq_low, " qUp=", iq_up, ")...")
 ce <- quantilePositions(ce, clusters = "tagClusters",
                         qLow = iq_low, qUp = iq_up)
 
+# ── consensus clusters ────────────────────────────────────────────────────────
+# Tag clusters of the individual samples are merged across samples when their
+# interquantile ranges lie within cons_max_dist of one another; tag clusters
+# below cons_tpm are ignored. CAGEr's defaults are 5 TPM and 100 bp; the values
+# in use, and why, are recorded beside the keys in the params file.
+message("  consensus clusters (tpmThreshold=", cons_tpm, " maxDist=", cons_max_dist, ")...")
+ce <- aggregateTagClusters(ce, tpmThreshold = cons_tpm, qLow = iq_low, qUp = iq_up,
+                           maxDist = cons_max_dist)
+ce <- cumulativeCTSSdistribution(ce, clusters = "consensusClusters",
+                                 useMulticore = FALSE)
+ce <- quantilePositions(ce, clusters = "consensusClusters",
+                        qLow = iq_low, qUp = iq_up)
+message("  consensus clusters: ", length(consensusClustersGR(ce)))
+
 # ── save RDS ──────────────────────────────────────────────────────────────────
 message("  saving RDS: ", out_rds)
 saveRDS(ce, out_rds)
@@ -161,8 +181,11 @@ tc_list <- lapply(sampleLabels(ce), function(sid) {
     start          = start(gr),
     end            = end(gr),
     strand         = as.character(strand(gr)),
-    dominant_ctss  = if (!is.null(mcols(gr)$dominant_ctss)) mcols(gr)$dominant_ctss else NA_integer_,
-    tpm            = if (!is.null(mcols(gr)$tpm.dominant))  mcols(gr)$tpm.dominant  else NA_real_
+    # Since CAGEr 2.12 dominant_ctss is a GRanges, so its position is taken.
+    dominant_ctss  = if (is.null(mcols(gr)$dominant_ctss)) NA_integer_ else
+                       if (is(mcols(gr)$dominant_ctss, "GRanges")) start(mcols(gr)$dominant_ctss) else
+                         as.integer(mcols(gr)$dominant_ctss),
+    tpm            = if (!is.null(mcols(gr)$tpm.dominant))  as.numeric(mcols(gr)$tpm.dominant)  else NA_real_
   )
 
   # IQW: try common column name variants across CAGEr versions

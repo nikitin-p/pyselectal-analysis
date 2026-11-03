@@ -104,6 +104,15 @@ cager_keep_singletons_above:  5       # distclu keepSingletonsAbove
 cager_iqw_qlow:               0.1     # lower quantile for IQW
 cager_iqw_qup:                0.9     # upper quantile for IQW
 cager_iqw_tpm_threshold:      3       # tpmThreshold for plotInterquantileWidth
+cager_tpm_pass_samples:       1       # filterLowExpCTSS nrPassThreshold (CAGEr default)
+# Consensus clusters (aggregateTagClusters). CAGEr's defaults are 5 TPM and
+# 100 bp; the values below are those of the earlier cageseq run of this data
+# (results/cageseq/cager_report.html). At 100 bp, 40 % of neighbouring
+# same-strand distclu clusters (median gap 172 bp) would be chained together,
+# against the gaps below 20 bp that distclu itself already closes, so 20 bp keeps
+# the consensus set at the resolution of the tag clusters it summarises.
+cager_consensus_tpm_threshold: 2
+cager_consensus_max_dist:      20
 
 # ── Stage 08: seqArchR sequence architectures ────────────────────────────────
 # Window is asymmetric because the yeast TATA box sits unusually far upstream
@@ -243,3 +252,24 @@ exo_motif_min_positions: 20      # positions a type needs before its own logo is
 # on the flat AT-rich yeast background that carries no per-type signal. It must
 # not exceed exo_motif_flank, which is the window the sequences are cut from.
 exo_logo_flank:          10      # bases each side, two-group context logos only
+
+# ── Stage 21: subsampled 5' end bigWigs ──────────────────────────────────────
+# A black pooled-total track and one coloured track per 5' end type, each
+# holding every read of its type; the type tracks add up to the total.
+results_tracks_sub:         "results/tracks_subsampled"
+
+# ── Stage 22: origins of the long 5' soft clips ──────────────────────────────
+# A long clip is one longer than dom_max_clip. Each clip is placed either by the
+# annotated-intron model (the clip is the end of exon 1) or by an exact search
+# upstream on the read strand; the reversed clip is run through the same steps
+# as a chance-match control. A clip of median 7 nt cannot be placed genome-wide,
+# which is why the search is local: a 2 kb window holds a given 8-mer by chance
+# a few percent of the time, and the control measures that rate directly.
+results_longclip:    "results/longclip"
+lc_max_untemplated:  3      # leading clip bases allowed to be untemplated (cap G etc.)
+lc_acceptor_window:  8      # aligned start up to this far inside an intron's 3' end; also the junction slide
+lc_min_identity:     0.9    # clip vs exon-1 identity for the annotated-intron model
+lc_min_search:       8      # templated clip bases needed before the search is attempted
+lc_search_window:    2000   # bases searched upstream of the aligned 5' end, read strand
+lc_min_intron:       30     # smallest gap tested for a GT..AG splice
+lc_adjacent_gap:     10     # gaps up to this are "templated_adjacent"
