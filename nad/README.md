@@ -188,7 +188,7 @@ otherwise the slippage signal swamps it.
 ## Analysis plan
 
 1. Download the 12 priority-1 runs on the vavilov cluster into `nad/data/nad_captureseq/` with `nad/scripts/00_download/download.sh`, which reads the run list, ENA md5 sums and URLs from `nad/scripts/00_download/priority1_runs.tsv`, and add the 36 priority-2 runs only if step 5 gives a signal.
-2. Strip the 3′ adapter with its UMI, strip the leading G run, keep reads of at least 18 nt (the authors' threshold for genome mapping), and record the length of the removed G run for each read.
+2. Strip the 3′ adapter with its UMI, strip the leading G run, keep reads of at least 18 nt (the authors' threshold for genome mapping), and record the length of the removed G run for each read. This step is `nad/scripts/02_trim/run.sh`: cutadapt removes the adapter (reads that do not reach it are kept with the UMI recorded as `NNNNNN`), and `umi_grun.awk` cuts the `C` and the six-base UMI, strips the G run and writes the read name as `<id>_g<G-run length>_<UMI>`, so that STAR and umi_tools both keep the two values. A check on 20,000 reads per library found that the insert starts with A in 50 % of WT reads and in 72 % of triple-mutant reads.
 3. Map to sacCer3 with STAR, forcing end-to-end alignment at the 5′ end (`--alignEndsType Extend5pOfRead1`) so that the first aligned base is the RNA 5′ end, and keep MAPQ 255 as in Stage 1.
 4. Count strand-aware 5′ ends per position, per replicate and separately for S and N, call positions or `distclu` clusters enriched in S over N with DESeq2, and require a genomic A at +1. A `YAAG` logo should reappear among the top triple-mutant calls and serves as the positive control for the pipeline.
 5. Join the NAD-enriched positions to `results/tss/typed_ctss.tsv.gz` and compare their CAGE end-type composition (`1Sa`, `M` starting on A, `1Sg` starting on A, `2Saa`) against control positions that start with A, are expressed at matched CAGE depth, and are not enriched in NAD captureSeq, which mirrors the authors' background set; the test is a per-position Fisher or a matched permutation test.
@@ -229,7 +229,7 @@ does. The project `.gitignore` ignores any folder named `results/`, `reports/`,
 
 ## Status
 
-Step 1 is done. It is run with `bash nad/scripts/01_chrM_end_types/run.sh`, which
+Step 1 is done. Step 0 (`nad/scripts/00_download/`) and step 2 (`nad/scripts/02_trim/`) are scripted for the vavilov cluster. It is run with `bash nad/scripts/01_chrM_end_types/run.sh`, which
 writes its tables to `nad/results/01_chrM_end_types/` and the figure to
 `nad/figures/01_chrM_single_A_clip.{pdf,png}`. The report
 `nad/reports/nad_first_finding.qmd` presents that figure and renders to a
