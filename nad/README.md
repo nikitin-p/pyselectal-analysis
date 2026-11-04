@@ -192,8 +192,113 @@ otherwise the slippage signal swamps it.
 3. Map to sacCer3 with STAR, forcing end-to-end alignment at the 5′ end (`--alignEndsType Extend5pOfRead1`) so that the first aligned base is the RNA 5′ end, and keep MAPQ 255 as in Stage 1. This step is `nad/scripts/03_map/run.sh`, which builds the index from the same `genome_fasta` and `annotation_gtf` that the CAGE pipeline used, so that NAD 5′ ends and CAGE CTSSs share coordinates, and which caps mismatches at 10 % of the mapped length because inserts can be as short as 18 nt.
 4. Count strand-aware 5′ ends per position, per replicate and separately for S and N (`nad/scripts/04_ctss/run.sh` writes per-run tables with raw and UMI-collapsed counts, the genomic base at +1, the number of reads with a mismatched first base, and position-by-run matrices for the next part of the step), call positions or `distclu` clusters enriched in S over N with DESeq2, and require a genomic A at +1. A `YAAG` logo should reappear among the top triple-mutant calls and serves as the positive control for the pipeline.
 5. Join the NAD-enriched positions to `results/tss/typed_ctss.tsv.gz` and compare their CAGE end-type composition (`1Sa`, `M` starting on A, `1Sg` starting on A, `2Saa`) against control positions that start with A, are expressed at matched CAGE depth, and are not enriched in NAD captureSeq, which mirrors the authors' background set; the test is a per-position Fisher or a matched permutation test.
-6. Reverse the direction by asking whether positions dominated by `1Sa` (Stage 17) are enriched in NAD captureSeq S over N, and whether `1Sa` positions carry the `YAAG` motif more often than matched `1Sg` positions.
-7. Measure, in the same NAD captureSeq libraries, the 5′-end signal at the chrM `ATATAAGTA` sites (`chr17` in the authors' assembly, chrM after remapping) to confirm that the mitochondrial `1Sa` sites are NAD 5′ ends.
+6. Reverse the direction by asking whether positions dominated by `1Sa` (Stage 17) are enriched in NAD captureSeq S over N, and whether `1Sa` positions carry the `YAAG` motif more often than matched `1Sg` positions. This item is step 8 (`nad/scripts/08_1Sa_positions/`), and its result is described in its own section below.
+7. Measure, in the same NAD captureSeq libraries, the 5′-end signal at the chrM `ATATAAGTA` sites (`chr17` in the authors' assembly, chrM after remapping) to confirm that the mitochondrial `1Sa` sites are NAD 5′ ends. This item is `nad/scripts/07_chrM_sites/`, and its result is described in the next section.
+
+## Mitochondrial promoter starts in NAD captureSeq (plan item 7)
+
+Item 7 refits the DESeq2 model of the S-versus-N step with its size factors
+unchanged and adds a window of −3..+3 nt around every chrM promoter start, even
+where the step-5 pre-filter dropped the position. The sites are all 14
+occurrences of `ATATAAGTA` in chrM, taken with the final A as +1, together with
+73704 (COX2) and 6548 (15S rRNA), which step 1 marked as promoter starts by the
+`AAGTA` core alone. The cluster part (`run.sh`, `deseq_chrM_sites.R`) writes
+`nad/results/07_chrM_sites/{motif_sites,controls,sanity}.tsv`, and
+`07_join_cage.R` on the Mac adds the CAGE counts and draws
+`nad/figures/07_chrM_sites.pdf`. The refit reproduces step 5 exactly (identical
+size factors, r = 1 for log2FC on shared positions), and the chrM tRNA positions
+are not enriched (median log2FC −0.94 in WT and −3.44 in the triple mutant).
+
+The table gives every site with CAGE reads, at +1, as mean normalised S reads
+and log2FC; N holds 0–3 reads at every site.
+
+| Site | CAGE reads | CAGE `1Sa` (%) | WT S | WT log2FC | triple S | triple log2FC |
+|---|---|---|---|---|---|---|
+| 58008 (21S) | 120,081 | 2.7 | 728 | 12.0 | 653 | 10.5 |
+| 73704 (COX2) | 12,626 | 63.5 | 240 | 10.4 | 57 | 7.0 |
+| 6548 (15S) | 6,955 | 12.2 | 0 | – | 0 | – |
+| 6470 (15S promoter) | 5,536 | 30.4 | 0.5 | ns | 0.2 | ns |
+| 46079 (ATP9) | 1,509 | 37.2 | 1.7 | ns | 0.6 | ns |
+| 13357 (COX1) | 1,084 | 29.4 | 35 | 7.6 | 0.9 | ns |
+| 82329 | 125 | 64.8 | 179 | 10.0 | 3.2 | ns |
+| 54840 (− strand) | 64 | 64.1 | 625 | 11.8 | 69 | 7.3 |
+| 32217 | 17 | 41.2 | 37 | 7.7 | 4.1 | 3.2 |
+
+The findings are the following:
+
+- in WT six promoter starts are enriched in S over N (58008, 73704, 13357, 82329, 54840 and 32217), and at each of them the NAD captureSeq reads begin exactly on the final A, which is the position that carries the `1Sa` excess in CAGE;
+- the remaining seven `ATATAAGTA` sites carry no NAD captureSeq reads and at most ten CAGE reads, which suggests promoters that are inactive in both growth conditions;
+- the CAGE `1Sa` share does not predict the NAD signal everywhere, because 6470 (15S promoter, 30 % `1Sa`) and 46079 (ATP9, 37 % `1Sa`) carry at most three S reads per replicate, and 6548 carries none at +1;
+- the triple mutant shows the same sites more weakly, which fits mitochondrial RNA being diluted in its S libraries by the nuclear NAD-RNAs that accumulate without the decapping enzymes;
+- the three chrM processing sites that start on a G followed by `TGCGC` (16471, 13987 and 25343) carry no reads in S or N although CAGE sees thousands of reads there, so NAD captureSeq does not pick up every abundant chrM 5′ end, but these sites cannot test enrichment.
+
+The strongest S signal at the 21S rRNA promoter does not sit on the initiating A.
+At 58010, two nucleotides downstream, WT S holds 3,617, 1,614 and 1,222 reads
+in the three replicates against 1,222, 650 and 500 at 58008, and the three N
+libraries together hold three reads. Ensembl annotates the 21S rRNA gene (Q0158)
+from 58009, so 58009–58010 is the processed 5′ end of the mature rRNA. A check of
+the reads (`first_base_check.sh`) showed that 99.6 % of them start on the genomic
+T at 58010 without a mismatch, and that their stripped G run is on average only
+0.25 G longer than at 58008 (3.55 against 3.31 in WT), so at most about a fifth of
+them can come from the G at 58009 whose base the G-run strip removed. In either
+case the end is a G or a T and cannot carry NAD, and premature reverse
+transcription stops before the cap are an unlikely cause, because the identical
+`AGT` start of COX2 gives a read at +3 for only about 5 % of the reads at +1.
+Item 7 therefore supports NAD at 58008 itself and treats the mature 21S end as a
+non-NAD RNA that is nonetheless specific to S.
+
+The conclusion is that most mitochondrial promoter starts with a `1Sa` excess in
+CAGE are NAD 5′ ends in NAD captureSeq, which agrees with the hypothesis that an
+NAD cap is read by CAGE as a soft-clipped A, while 6470 and 46079 remain
+unexplained.
+
+## Nuclear `1Sa` positions in NAD captureSeq (plan item 6, step 8)
+
+Stage 19's position-level cascade calls only five nuclear positions
+`1Sa`-dominated, so step 8 defines the `1Sa` positions by a share threshold
+instead. A candidate is a nuclear Y|A position with a pooled CAGE depth of at
+least 25 reads, which gives 34,089 candidates. A `1Sa` position is a candidate
+whose `1Sa` share is at least 10 %, which gives 554 positions, and the thresholds
+5 % and 20 % serve as sensitivity checks. Most of the 554 sit on A tracts (3, 83,
+81, 259 and 128 at A runs of 1, 2, 3, 4 and 5 or more), as step 1 found. The NAD
+signal of every candidate is read from the step-4 matrix, which was copied to
+the Mac, and is scaled by the step-5 size factors, which the script recomputes
+exactly. A position counts as NAD-detected when at least two of the three S runs
+carry a read and the mean normalised S exceeds twice the mean normalised N.
+`1Sa` positions are compared with the other candidates by a stratified label
+permutation over the −1 base, the A-run length and the CAGE depth bin, as in
+step 6. The script `08_1Sa_positions.R` runs directly with `Rscript` and has no
+wrapper. It writes its tables to `nad/results/08_1Sa_positions/` and the figure
+to `nad/figures/08_1Sa_positions.pdf`.
+
+The checks pass. The recomputed signal reproduces the `meanS` and `meanN` of step 5
+to within 5e-15 on all shared positions. With the NAD values shuffled within
+strata, 1 of 60 tests over five seeds gives p < 0.05, and a planted detection of
+30 % of the `1Sa` positions is found with p = 0.001.
+
+| Strain | `1Sa` threshold | NAD-detected, `1Sa` positions | NAD-detected, matched controls | p |
+|---|---|---|---|---|
+| triple mutant | ≥ 5 % | 33.9 % | 35.4 % | 0.005 |
+| triple mutant | ≥ 10 % | 32.4 % | 33.1 % | 0.50 |
+| triple mutant | ≥ 20 % | 36.8 % | 32.1 % | 0.26 |
+| WT | ≥ 5 % | 4.8 % | 4.3 % | 0.60 |
+| WT | ≥ 10 % | 5.6 % | 3.6 % | 0.12 |
+| WT | ≥ 20 % | 8.3 % | 3.3 % | 0.007 |
+
+The findings are the following:
+
+- the nuclear `1Sa` positions are not NAD 5′ ends more often than matched positions in the triple mutant, which maps NAD incorporation most fully, and at the 5 % threshold they are detected slightly less often;
+- the only excess is in WT at the 20 % threshold, where 11 of 133 positions are detected against about 4 expected; these positions lie on A runs of 4 or more, and the excess is the one nominal hit among 12 tests, so it would not survive a correction for multiple testing;
+- relative to the rate expected from its stratum, detection stays near 1 across `1Sa` share bins in the triple mutant, and it drops to 0.67–0.80 at A runs of 2 for `1Sa` shares between 2 and 20 %, which is the only run length at which `YAAG` can occur;
+- among A-run-2 candidates, the G at +3 that completes `YAAG` is present at 1 of 83 `1Sa` positions (1.2 %) against 40 % of matched `1Sg`-majority positions (p = 0.001), so the nuclear `1Sa` positions avoid the motif of NAD-capped nuclear starts;
+- the chrM `1Sa` positions serve as the positive control: 40 % of them are NAD-detected in WT and 67 % in the triple mutant, against 6 % and 32 % of the nuclear `1Sa` positions.
+
+The conclusion is that nuclear `1Sa` reflects slippage on A tracts rather than
+NAD caps, which agrees with step 1 and with the absence of a `1Sa` excess at the
+nuclear NAD starts in step 6. The link between `1Sa` and NAD holds only on chrM.
+The detection rule is lenient, since it counts 30–47 % of all candidates as
+detected in the triple mutant, so it separates NAD starts from other positions
+less sharply than a strict call would.
 
 ## Caveats
 
@@ -203,7 +308,9 @@ The caveats below limit what any result can show:
 - NAD-RNAs are short and rapidly decapped in WT cells, so a WT CAGE library may barely sample them, and the triple mutant maps where NAD is incorporated rather than where it survives;
 - a nuclear signal is capped at a few percent of reads per TSS, so the test needs pooled positions and depth-matched controls rather than single-site calls;
 - whether reverse transcriptase adds T opposite nicotinamide riboside is unknown, and an in vitro check with a synthetic NAD-RNA put through the CAGE reverse-transcription step would settle which signature to expect;
-- a `1Sa` excess at NAD sites would show a non-m7G adenosine cap, and FAD caps would look the same.
+- a `1Sa` excess at NAD sites would show a non-m7G adenosine cap, and FAD caps would look the same;
+- enrichment in S over N does not prove an NAD cap, because the N libraries are nearly empty at mRNA starts and any 5′ end that reaches S looks enriched, as the mature 21S rRNA end at chrM:58010 shows;
+- an NAD cap can sit only on an A, yet 22 % of the enriched unmasked nuclear positions of step 5 in WT and 23 % in the triple mutant start on C or T, and G starts are invisible after the G-run strip, so at least about a fifth of the enriched positions are not NAD 5′ ends and the A-starting set used in step 6 is diluted by an unknown non-NAD share as well.
 
 ## Layout
 
@@ -214,11 +321,12 @@ pipeline stages:
 nad/
   README.md      # this file
   scripts/       # one folder per step, each with a run.sh wrapper
-    01_chrM_end_types/
+    00_download/ 01_chrM_end_types/ 02_trim/ 03_map/ 04_ctss/
+    05_deseq/ 06_cage_end_types/ 07_chrM_sites/ 08_1Sa_positions/
   results/       # tables, one folder per step
   figures/       # figures, prefixed by step number
   reports/       # Quarto reports
-  data/          # NAD captureSeq FASTQ, once downloaded
+  data/          # NAD captureSeq FASTQ, BAMs and the Ensembl GTF (on vavilov)
   logs/          # wrapper logs
 ```
 
@@ -229,9 +337,15 @@ does. The project `.gitignore` ignores any folder named `results/`, `reports/`,
 
 ## Status
 
-Step 1 is done. Steps 0, 2, 3 and 4 up to the count matrices (`nad/scripts/00_download/`, `02_trim/`, `03_map/`, `04_ctss/`) are scripted for the vavilov cluster. The S-versus-N test needs DESeq2, which is installed neither on the Mac nor on the cluster. It is run with `bash nad/scripts/01_chrM_end_types/run.sh`, which
-writes its tables to `nad/results/01_chrM_end_types/` and the figure to
-`nad/figures/01_chrM_single_A_clip.{pdf,png}`. The report
-`nad/reports/nad_first_finding.qmd` presents that figure and renders to a
-self-contained HTML file. No NAD captureSeq data have been downloaded yet, and the
-branch has not been given a number in `docs/stages.md`.
+Steps 0–8 have been run. Step 1 (`nad/scripts/01_chrM_end_types/run.sh`, Mac)
+writes `nad/figures/01_chrM_single_A_clip.{pdf,png}`, which the report
+`nad/reports/nad_first_finding.qmd` presents. Steps 0 and 2–5 run on the vavilov
+cluster through `sbatch`, and the S-versus-N test of step 5 runs in the conda
+env `r_nad` (`envs/r_nad.yml`). Step 5 found 300 enriched unmasked positions in WT
+and 4,402 in the triple mutant, and the `YAAG` positive control passed. Step 6
+(`nad/scripts/06_cage_end_types/`, Mac) found no `1Sa` excess in CAGE at the
+nuclear NAD starts of the triple mutant (0.30 % against 0.36 % at matched
+controls, ratio 0.82, p = 0.017). Step 7 (`nad/scripts/07_chrM_sites/`, cluster
+and Mac) and step 8 (`nad/scripts/08_1Sa_positions/`, Mac) are described in
+their own sections above. The branch has not been given a
+number in `docs/stages.md`.

@@ -12,10 +12,14 @@
 # Outputs:
 #   nad/results/07_chrM_sites/motif_sites_cage.tsv
 #   nad/figures/07_chrM_sites.pdf
-#     A  log2FC S/N: nuclear NAD positions, motif sites at their best window
-#        offset (the offset with the most S reads), processing sites, chrM tRNA;
+#     A  log2FC S/N at +1: nuclear NAD positions, motif sites, processing
+#        sites, chrM tRNA. +1 rather than the best window offset, because at
+#        the 21S promoter the best offset is +2 (58010), the processed 5' end
+#        of the mature rRNA (Q0158 starts at 58009), which cannot carry NAD;
 #     B  CAGE single-A clip share against NAD log2FC per motif site at +1;
-#     C  mean normalised S reads per site across the -3..+3 window.
+#        sites with CAGE reads but no NAD reads are drawn at x = 0;
+#     C  mean normalised S reads per site across the -3..+3 window, with the
+#        mature 21S end marked.
 #
 # Usage (from project root):
 #   Rscript nad/scripts/07_chrM_sites/07_join_cage.R [--ctss results/tss/typed_ctss.tsv.gz]
@@ -26,6 +30,7 @@ suppressPackageStartupMessages({
   library(data.table)
   library(ggplot2)
   library(patchwork)
+  library(ggrepel)
 })
 
 args <- commandArgs(trailingOnly = TRUE)
@@ -57,6 +62,10 @@ TYPE_A1 <- END_TYPES_REAL[END_TYPE_CLIP_BASE[END_TYPES_REAL] %in% "A" &
 stopifnot(length(TYPE_A1) == 1)
 col_A1 <- paste0("n_", TYPE_A1)
 COL_HI <- "#e63946"
+# Gene context of the sites, for figure labels only (step-1 top-site table).
+SITE_GENE <- c(`chrM+58008` = "21S", `chrM+73704` = "COX2", `chrM+6548` = "15S",
+               `chrM+6470` = "15S prom.", `chrM+46079` = "ATP9", `chrM+13357` = "COX1")
+MATURE_21S <- data.table(site_id = "chrM+58008", offset = 2L, note = "mature 21S 5' end")
 
 ms <- fread(file.path(indir, "motif_sites.tsv"))
 strain_lv <- unique(ms$strain)
@@ -91,11 +100,14 @@ nuc <- rbindlist(lapply(unique(ms$strain), function(st) {
       log2FoldChange > 1, .(strain = st, log2FoldChange)]
 }))
 
-grp_lv <- c("nuclear NAD", "ATATAAGTA (best offset)", "AAGTA core, step 1 (best offset)",
+site_lab <- function(id) ifelse(id %in% names(SITE_GENE),
+                                sprintf("%s %s", sub("chrM", "", id), SITE_GENE[id]), sub("chrM", "", id))
+grp_lv <- c("nuclear NAD", "ATATAAGTA (+1)", "AAGTA core, step 1 (+1)",
             "processing", "chrM tRNA")
+p1 <- ms[offset == 0]
 pa <- rbind(nuc[, .(strain, grp = grp_lv[1], log2FoldChange, called = TRUE, lab = NA_character_)],
-            best[, .(strain, grp = fifelse(class == "motif", grp_lv[2], grp_lv[3]), log2FoldChange,
-                     called, lab = sub("chrM", "", site_id))],
+            p1[, .(strain, grp = fifelse(class == "motif", grp_lv[2], grp_lv[3]), log2FoldChange,
+                   called, lab = site_lab(site_id))],
             ct[class == "processing", .(strain, grp = grp_lv[4], log2FoldChange, called,
                                         lab = sub("chrM", "", site_id))],
             ct[class == "tRNA", .(strain, grp = grp_lv[5], log2FoldChange, called, lab = NA_character_)])
@@ -107,35 +119,49 @@ pA <- ggplot(pa, aes(grp, log2FoldChange)) +
   geom_hline(yintercept = 0, linewidth = 0.3) +
   geom_hline(yintercept = 1, linetype = "dashed", linewidth = 0.3) +
   geom_violin(data = pa[grp %in% grp_lv[c(1, 5)]], fill = "grey85", colour = NA, scale = "width") +
-  geom_jitter(data = pa[!grp %in% grp_lv[c(1, 5)]], aes(colour = called), width = 0.15, height = 0, size = 1.6) +
-  geom_text(data = pa[grp %in% grp_lv[2:3]], aes(label = lab), size = 2, hjust = -0.25, check_overlap = TRUE) +
+  geom_point(data = pa[!grp %in% grp_lv[c(1, 5)]], aes(colour = called), size = 1.6) +
+  geom_text_repel(data = pa[grp %in% grp_lv[2:3]], aes(label = lab), size = 2,
+                  direction = "y", nudge_x = 0.35, hjust = 0, segment.size = 0.2,
+                  min.segment.length = 0, seed = 1) +
   scale_colour_manual("padj < 0.05 and\nlog2FC > 1", values = c(`TRUE` = COL_HI, `FALSE` = "grey40")) +
   scale_x_discrete(limits = grp_lv) +
   facet_wrap(~ strain) +
   labs(x = NULL, y = "log2 fold change S / N",
-       title = "A. NAD captureSeq S vs N at the chrM ATATAAGTA starts") +
+       title = "A. NAD captureSeq S vs N at +1 of the chrM promoter starts",
+       caption = "Sites without any S or N reads have no log2FC and are not drawn.") +
   theme_bw(base_size = 9) + theme(axis.text.x = element_text(angle = 30, hjust = 1))
 
 ms[, strain := factor(strain, strain_lv)]
-pb <- ms[offset == 0 & is.finite(log2FoldChange)]
-pB <- ggplot(pb, aes(log2FoldChange, 100 * get(fA1))) +
+pb <- ms[offset == 0 & cage_n_total > 0]
+pb[, `:=`(x = fifelse(is.finite(log2FoldChange), log2FoldChange, 0),
+          nad = fifelse(is.finite(log2FoldChange), "NAD reads", "no NAD reads"),
+          lab = site_lab(site_id))]
+pB <- ggplot(pb, aes(x, 100 * get(fA1))) +
   geom_vline(xintercept = 1, linetype = "dashed", linewidth = 0.3) +
-  geom_point(aes(size = cage_n_total, colour = called)) +
-  geom_text(aes(label = sub("chrM", "", site_id)), size = 2, vjust = -1.1, check_overlap = TRUE) +
-  scale_size_area("CAGE reads", max_size = 4) +
+  geom_point(aes(size = cage_n_total, colour = called, shape = nad), stroke = 0.6) +
+  geom_text_repel(aes(label = lab), size = 2, segment.size = 0.2, min.segment.length = 0,
+                  box.padding = 0.4, max.overlaps = Inf, seed = 1) +
+  scale_size("CAGE reads", trans = "log10", range = c(1, 5), breaks = c(10, 100, 1e3, 1e4, 1e5),
+             labels = c("10", "100", "1,000", "10,000", "100,000")) +
+  scale_shape_manual(NULL, values = c(`NAD reads` = 16, `no NAD reads` = 1)) +
   scale_colour_manual(values = c(`TRUE` = COL_HI, `FALSE` = "grey40"), guide = "none") +
   facet_wrap(~ strain) +
   labs(x = "NAD log2 fold change S / N at +1", y = sprintf("CAGE %s share at +1 (%%)", TYPE_A1),
        title = sprintf("B. CAGE %s share against NAD enrichment", TYPE_A1)) +
   theme_bw(base_size = 9)
 
-pC <- ggplot(ms, aes(factor(offset), site_id, fill = log10(meanS + 1))) +
+ord <- unique(ms[order(strand, site)]$site_id)
+ms[, site_lab := factor(site_lab(site_id), site_lab(ord))]
+mk <- merge(unique(ms[, .(strain, site_id, site_lab)]), MATURE_21S, by = "site_id")
+pC <- ggplot(ms, aes(factor(offset), site_lab, fill = log10(meanS + 1))) +
   geom_tile() +
   geom_point(data = ms[called == TRUE], shape = 4, size = 0.8) +
+  geom_tile(data = mk, aes(factor(offset), site_lab), inherit.aes = FALSE,
+            fill = NA, colour = "black", linewidth = 0.4) +
   scale_fill_gradient("log10 mean\nnormalised S + 1", low = "white", high = COL_HI) +
   facet_wrap(~ strain) +
   labs(x = "offset from the final A of ATATAAGTA (nt)", y = NULL,
-       title = "C. S reads across the window (x: called)") +
+       title = "C. S reads across the window (x: called; boxed: mature 21S end, not an NAD start)") +
   theme_bw(base_size = 9)
 
 p <- pA / pB / pC + plot_layout(heights = c(1, 1, 1.2))
