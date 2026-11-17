@@ -262,45 +262,83 @@ print(res3[, lapply(.SD, function(x) if (is.numeric(x)) signif(x, 3) else x)])
 print(chrm)
 
 # ── figure ───────────────────────────────────────────────────────────────────
+# A: at the main threshold, how often NAD captureSeq sees something at nuclear
+#    1Sa-rich positions, at matched ordinary nuclear positions (median and 95 %
+#    range of the random matched sets) and at chrM 1Sa-rich positions, the
+#    positive control. B: the same comparison at every threshold, as a ratio to
+#    the matched median (the style of figure 06). C: YAAG. The dose response by
+#    A run and clip-share bin stays in dose_response.tsv.
 COL_HI <- "#e63946"
-dose[, strain := factor(strain, strains)]
-pA <- ggplot(dose[n >= 10], aes(share_bin, obs_over_exp, colour = factor(arun), group = factor(arun))) +
-  geom_hline(yintercept = 1, linewidth = 0.3) +
-  geom_line(linewidth = 0.4) + geom_point(aes(size = n)) +
-  scale_size_area("positions", max_size = 3) +
-  scale_colour_viridis_d("A run from +1", end = 0.9) +
+th <- theme_bw(base_size = 9) +
+  theme(panel.grid.minor = element_blank(), plot.title = element_text(size = 9, face = "bold"),
+        plot.subtitle = element_text(size = 7.5))
+strain_name <- function(s) factor(fifelse(s == "WT", "WT", "triple mutant"), c("WT", "triple mutant"))
+rich_lab <- sprintf("%s-rich", TYPE_A1)
+
+m1 <- res1[statistic == "detected_share" & threshold == MAIN_T]
+pa <- rbind(
+  m1[, .(strain, set = sprintf("nuclear,\n%s", rich_lab), share = observed, lo = NA_real_, hi = NA_real_,
+         n = n_test, p)],
+  m1[, .(strain, set = "nuclear,\nmatched ordinary", share = null_med, lo = null_lo, hi = null_hi,
+         n = NA_integer_, p = NA_real_)],
+  chrm[set == "chrM, clip-rich", .(strain, set = sprintf("chrM,\n%s", rich_lab), share = detected_share,
+                                   lo = NA_real_, hi = NA_real_, n, p = NA_real_)])
+pa[, set := factor(set, unique(set))]
+pa[, strain := strain_name(strain)]
+pa[, lab := fifelse(is.na(n), sprintf("%.0f %%", 100 * share), sprintf("%.0f %%\n(%d)", 100 * share, n))]
+pa[, fill := c("rich", "matched", "chrM")[as.integer(set)]]
+pa[, py := 100 * max(c(share, hi)[as.integer(set) < 3], na.rm = TRUE) + 14, by = strain]
+pA <- ggplot(pa, aes(set, 100 * share)) +
+  geom_col(aes(fill = fill), width = 0.6) +
+  geom_errorbar(aes(ymin = 100 * lo, ymax = 100 * hi), width = 0.2, na.rm = TRUE) +
+  geom_text(aes(y = 100 * pmax(share, hi, na.rm = TRUE), label = lab), vjust = -0.3, size = 2.5, lineheight = 0.9) +
+  geom_text(data = pa[!is.na(p)], aes(x = 1.5, y = py, label = sprintf("p = %.2g", p)), size = 2.5) +
+  scale_fill_manual(values = c(rich = COL_HI, matched = "grey65", chrM = "grey25"), guide = "none") +
+  scale_y_continuous(limits = c(0, 92), breaks = seq(0, 80, 20)) +
   facet_wrap(~ strain) +
-  labs(x = sprintf("CAGE %s share at the position (%%)", TYPE_A1),
-       y = "NAD-detected share,\nobserved / expected from stratum",
-       title = sprintf("A. NAD detection by CAGE %s share, adjusted for -1 base, A run and depth (bins >= 10 positions)", TYPE_A1)) +
-  theme_bw(base_size = 9)
+  labs(x = NULL, y = "positions where NAD captureSeq\nsees a signal (%)",
+       title = sprintf("A. Does NAD captureSeq see CAGE %s-rich positions? (%s >= %.0f %% of CAGE reads)",
+                       TYPE_A1, TYPE_A1, 100 * MAIN_T),
+       subtitle = paste0("Signal: S reads in >= 2 of 3 replicates and S > 2 x N. Matched ordinary: same -1 base, A-run length\n",
+                         "and CAGE depth; bar = median, whisker = 95 % of 1000 random matched sets. chrM = positive control.")) +
+  th
 
-r1 <- copy(res1)[, `:=`(strain = factor(strain, strains),
-                         thr = factor(sprintf(">= %.0f %%", 100 * threshold), sprintf(">= %.0f %%", 100 * THRESHOLDS)))]
-pB <- ggplot(r1, aes(thr)) +
-  geom_linerange(aes(ymin = null_lo, ymax = null_hi), colour = "grey60", linewidth = 2) +
-  geom_point(aes(y = null_med), colour = "grey30", shape = 95, size = 5) +
-  geom_point(aes(y = observed), colour = COL_HI, size = 2) +
-  geom_text(aes(y = pmax(observed, null_hi), label = sprintf("p = %.3g", p)), vjust = -0.8, size = 2.2) +
-  facet_grid(statistic ~ strain, scales = "free_y") +
-  scale_y_continuous(expand = expansion(mult = c(0.05, 0.2))) +
-  labs(x = sprintf("%s-rich threshold", TYPE_A1), y = NULL,
-       title = sprintf("B. %s-rich positions (red) against the stratified permutation null (grey: 95 %%)", TYPE_A1)) +
-  theme_bw(base_size = 9)
+r1 <- res1[statistic == "detected_share"]
+# a null range that reaches 0 is clipped at the axis minimum, which a log axis needs
+r1[, `:=`(strain = strain_name(strain), rel = observed / null_med, lo = pmax(null_lo / null_med, 0.5),
+          hi = null_hi / null_med,
+          thr = factor(sprintf(">= %.0f %%", 100 * threshold), rev(sprintf(">= %.0f %%", 100 * THRESHOLDS))))]
+pB <- ggplot(r1, aes(y = thr)) +
+  geom_vline(xintercept = 1, colour = "grey40") +
+  geom_linerange(aes(xmin = lo, xmax = hi), linewidth = 3, colour = "grey80") +
+  geom_point(aes(x = rel, colour = p < 0.05), size = 2.6) +
+  geom_text(aes(x = 6, label = sprintf("p = %.2g", p)), hjust = 1, size = 2.5, colour = "grey30") +
+  scale_colour_manual(values = c(`TRUE` = COL_HI, `FALSE` = "black"), guide = "none") +
+  scale_x_log10(limits = c(0.5, 6), breaks = c(0.5, 1, 2, 4), labels = c("×0.5", "×1", "×2", "×4")) +
+  facet_wrap(~ strain) +
+  labs(x = "signal share, 1Sa-rich / matched ordinary (log)",
+       y = sprintf("%s threshold", TYPE_A1),
+       title = "B. Same comparison at every 1Sa threshold",
+       subtitle = "Dot: 1Sa-rich positions (red: p < 0.05).\nGrey: 95 % of random matched sets. ×1 = no difference.") +
+  th + theme(panel.grid.major.y = element_blank())
 
-r3 <- rbind(res3[, .(set = sprintf("%s-rich", TYPE_A1), share = observed, lo = NA_real_, hi = NA_real_, controls)][1],
-            res3[, .(set = controls, share = control, lo = null_lo, hi = null_hi, controls)])
+r3 <- rbind(res3[1, .(set = rich_lab, share = observed, n = n_test)],
+            res3[, .(set = controls, share = control, n = n_ctl)])
 r3[, set := factor(set, unique(set))]
 pC <- ggplot(r3, aes(set, 100 * share)) +
-  geom_col(fill = c(COL_HI, "grey60", "grey60"), width = 0.6) +
-  geom_text(aes(label = sprintf("%.1f %%", 100 * share)), vjust = -0.4, size = 2.5) +
-  labs(x = NULL, y = "G at +3 (%)",
-       title = sprintf("C. YAAG: G at +3 among A-run-2 Y|A positions (p = %s vs %s-majority)",
-                       signif(res3$p[1], 3), END_TYPE_CANONICAL)) +
-  theme_bw(base_size = 9)
+  geom_col(fill = c(COL_HI, "grey65", "grey65"), width = 0.6) +
+  geom_text(aes(label = sprintf("%.1f %%\n(of %s)", 100 * share, prettyNum(n, big.mark = ","))),
+            vjust = -0.2, size = 2.5, lineheight = 0.9) +
+  scale_y_continuous(limits = c(0, 55)) +
+  labs(x = "nuclear Y|A positions with an A run of exactly 2 (Y|AA?)", y = "G at +3 (%)",
+       title = "C. The nuclear NAD motif YAAG: is there a G at +3?",
+       subtitle = sprintf("p = %.2g, %s-rich against %s-majority positions.", res3$p[1], TYPE_A1,
+                          END_TYPE_CANONICAL)) +
+  th
 
-ggsave(file.path(figdir, "08_1Sa_positions.pdf"), pA / pB / pC + plot_layout(heights = c(1, 1.2, 0.8)),
-       width = 8, height = 10)
+ggsave(file.path(figdir, "08_1Sa_positions.pdf"),
+       pA / (pB | pC + plot_layout()) + plot_layout(heights = c(1.1, 1)),
+       width = 10, height = 8)
 
 for (k in checks) msg("[%s] %s", if (k[2] == "TRUE") "PASS" else "FAIL", k[1])
 msg("[INFO] nuclear candidates %d, single-A-clip-rich (>= %.0f %%) %d", nrow(nuc), 100 * MAIN_T,

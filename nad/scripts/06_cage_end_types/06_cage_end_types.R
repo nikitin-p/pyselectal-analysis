@@ -236,22 +236,44 @@ print(comp[type %in% REPORTED, .(run, type, n_nad_pos, nad_share = signif(nad_sh
                                  ctrl_share = signif(ctrl_share, 3), ratio = round(ratio, 2), p)])
 
 # ── figure ───────────────────────────────────────────────────────────────────
-dr <- rbindlist(draws_out)[type %in% REPORTED]
-dr[, type := factor(type, levels = REPORTED)]
-ob <- comp[type %in% REPORTED][, type := factor(type, levels = REPORTED)]
-lab <- function(dt) dt[, run_lab := sprintf("%s: %s, CAGE %s, bg %s", run, strain, cage, background)]
-rl <- unique(lab(copy(ob))[, .(run, run_lab)])
-dr <- merge(dr, rl, by = "run"); ob <- lab(ob)
-p <- ggplot(dr, aes(x = 100 * share)) +
-  geom_histogram(bins = 40, fill = "grey70") +
-  geom_vline(data = ob, aes(xintercept = 100 * nad_share), colour = "#e63946", linewidth = 0.8) +
-  geom_text(data = ob, aes(x = 100 * nad_share, y = Inf, label = sprintf("x%.2f\np=%.3g", ratio, p)),
-            vjust = 1.2, hjust = -0.05, size = 2.6, colour = "#e63946") +
-  facet_grid(run_lab ~ type, scales = "free") +
-  labs(x = "share of CAGE reads, % (grey: stratified label-permutation null, red: NAD positions)", y = "draws",
-       title = "CAGE end types at NAD captureSeq 5' ends (Y|A starts)") +
-  theme_bw(base_size = 9) + theme(strip.text.y = element_text(angle = 0, hjust = 0))
+# One panel per run. Every share is divided by the median of its own null, so
+# types whose shares differ by orders of magnitude sit on one axis and 1 means
+# "as in matched ordinary positions". The grey bar is the 95 % range of the
+# 1000 matched random sets, the dot is the real NAD set. Run D is greyed out:
+# with ~100 controls against ~2,000 NAD positions its random sets consist
+# almost entirely of the NAD positions themselves, so it cannot differ.
+ob <- comp[type %in% REPORTED]
+ob[, type := factor(type, levels = rev(REPORTED))]
+ob[, `:=`(rel = nad_share / null_median, lo = null_lo / null_median, hi = null_hi / null_median)]
+ob[, reliable := run != "D"]
+ob[, run_lab := sprintf("%s. %s, CAGE %s%s\n%s NAD positions, %.1fM CAGE reads", run,
+                        fifelse(strain == "WT", "WT", "triple mutant"),
+                        fifelse(cage == "all", "all libraries", "glucose only"),
+                        fifelse(background == "all", "", ", NAD-tested controls"),
+                        format(n_nad_pos, big.mark = ","), n_nad_reads / 1e6)]
+ob[, run_lab := fifelse(reliable, run_lab, paste0(run_lab, "\nUNRELIABLE: too few controls"))]
+ob[, run_lab := factor(run_lab, levels = unique(run_lab[order(run)]))]
+ob[, p_lab := fifelse(p < 0.001, "p<0.001", sprintf("p=%.2g", p))]
+xr <- range(c(ob$lo, ob$hi, ob$rel)); xr <- c(min(xr[1], 0.5), max(xr[2], 2))
+p <- ggplot(ob, aes(y = type)) +
+  geom_vline(xintercept = 1, colour = "grey40") +
+  geom_linerange(aes(xmin = lo, xmax = hi), linewidth = 3, colour = "grey80") +
+  geom_point(aes(x = rel, colour = interaction(reliable, p < 0.05)), size = 2.6) +
+  geom_text(aes(x = xr[2] * 1.6, label = p_lab), size = 2.7, hjust = 1, colour = "grey30") +
+  scale_colour_manual(values = c("TRUE.TRUE" = "#e63946", "TRUE.FALSE" = "black",
+                                 "FALSE.TRUE" = "grey60", "FALSE.FALSE" = "grey60"), guide = "none") +
+  scale_x_log10(limits = c(xr[1], xr[2] * 1.6), breaks = c(0.25, 0.5, 1, 2, 4),
+                labels = c("×0.25", "×0.5", "×1", "×2", "×4")) +
+  facet_wrap(~ run_lab, nrow = 1) +
+  labs(x = "share of CAGE reads at NAD positions, relative to matched ordinary positions (log scale)",
+       y = NULL,
+       title = "Are CAGE end types different at NAD captureSeq 5' ends? (Y|A starts only)",
+       subtitle = paste0("Dot: NAD positions (red: p < 0.05). Grey bar: 95 % range of 1000 random sets of ordinary positions\n",
+                         "matched on the -1 base, A-run length and CAGE depth. ×1 = no difference. The hypothesis predicts 1Sa to the right.")) +
+  theme_bw(base_size = 9) +
+  theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(),
+        strip.text = element_text(hjust = 0), plot.subtitle = element_text(size = 8))
 ggsave(file.path(figdir, "06_end_types_nad_vs_control.pdf"), p,
-       width = 2.4 * length(REPORTED) + 2.5, height = 1.8 * length(runs) + 1)
+       width = 2.6 * length(runs) + 1, height = 0.32 * length(REPORTED) + 2.2)
 
 sessionInfo()

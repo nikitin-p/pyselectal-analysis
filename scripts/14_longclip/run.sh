@@ -22,6 +22,11 @@
 #   7. Location in gene structure, clip length per location, and 5' structure
 #      (including the untemplated junk) against location: tables
 #      lc_location_*.tsv and figure 28_longclip_location.pdf
+#   8. Original STAR CIGARs with soft clips drawn (BED12 / bigBed)
+#   9. Untemplated G at the start of long clips: figure 29_longclip_capG.pdf
+#  10. Shift of spliced reads into the intron: figure 30_longclip_splice_shift.pdf
+#  11. Other 5' end types at the long-clip sites against depth-matched control
+#      sites: tables lc_coprod_*.tsv and figure 31_longclip_coproduction.pdf
 #
 # Usage:
 #   bash scripts/14_longclip/run.sh [--params ...] [--samples ...] [--force] \
@@ -40,7 +45,7 @@ PARAMS="$ROOT_DIR/config/params.yaml"
 SAMPLES="$ROOT_DIR/config/samples.tsv"
 FORCE_FLAG=""
 PY_ENV=""
-BEDTOBIGBED="$(command -v bedToBigBed || true)"
+BEDTOBIGBED="$(command -v bedToBigBed || conda run -n ucsc which bedToBigBed 2>/dev/null || true)"
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --params)      PARAMS="$2";      shift 2 ;;
@@ -148,8 +153,42 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/07_location.R" \
     --figdir    "$FIG_DIR" \
     --params    "$PARAMS" $FORCE_FLAG
 
+log_info "  step 8: original STAR CIGARs with soft clips drawn (BED12 / bigBed)"
+BB_FLAG=()
+if [[ -n "$BEDTOBIGBED" ]]; then
+    BB_FLAG=(--bedtobigbed "$BEDTOBIGBED")
+else
+    log_warn "bedToBigBed not found; writing longclip_cigar.bed only"
+fi
+log_to_file "$LOG" conda run -n "$PY_ENV" python "$SCRIPT_DIR/08_cigar_bed.py" \
+    --realigned "$LC_DIR/bam/longclip_realigned.bam" \
+    --fai       "$GENOME_FASTA.fai" \
+    --outdir    "$LC_DIR/bam" "${BB_FLAG[@]}" $FORCE_FLAG
+
+log_info "  step 9: untemplated G at the start of long clips"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/09_cap_g.R" \
+    --case   "$LC_DIR/bam/longclip_case.tsv.gz" \
+    --genes  "$ROOT_DIR/$(yaml_get annotation_bed_yeast "$PARAMS")" \
+    --gtf    "$ANNOTATION_GTF" \
+    --outdir "$LC_DIR" \
+    --figdir "$FIG_DIR" $FORCE_FLAG
+
+log_info "  step 10: shift of spliced reads into the intron"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/10_splice_shift.R" \
+    --reads  "$LC_DIR/longclip_reads.tsv.gz" \
+    --fasta  "$GENOME_FASTA" \
+    --outdir "$LC_DIR" \
+    --figdir "$FIG_DIR" $FORCE_FLAG
+
+log_info "  step 11: co-production of other end types at long-clip sites"
+log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/11_coproduction.R" \
+    --fine   "$DOM_DIR/fine_typed_ctss.tsv.gz" \
+    --reads  "$LC_DIR/longclip_reads.tsv.gz" \
+    --outdir "$LC_DIR" \
+    --figdir "$FIG_DIR" $FORCE_FLAG
+
 log_info "Stage 22 complete."
 log_info "  tables → $LC_DIR"
 log_info "  tracks → $LC_DIR/tracks"
-log_info "  BAMs   → $LC_DIR/bam"
-log_info "  figure → $FIG_DIR/26_longclip_origins.pdf, 27_longclip_m_counterparts.pdf, 28_longclip_location.pdf"
+log_info "  BAMs   → $LC_DIR/bam (and longclip_cigar.bed/.bb)"
+log_info "  figure → $FIG_DIR/26_longclip_origins.pdf, 27_longclip_m_counterparts.pdf, 28_longclip_location.pdf, 29_longclip_capG.pdf, 30_longclip_splice_shift.pdf, 31_longclip_coproduction.pdf"

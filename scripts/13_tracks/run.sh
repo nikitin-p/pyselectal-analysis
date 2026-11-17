@@ -67,6 +67,9 @@ log_to_file "$LOG" "$RSCRIPT" "$SCRIPT_DIR/02_make_hub.R" \
     --endtype  "$TRACK_DIR/track_manifest.tsv" \
     --cager    "$ROOT_DIR/$(yaml_get results_cager "$PARAMS")/tracks/track_manifest.tsv" \
     --longclip "$ROOT_DIR/$(yaml_get results_longclip "$PARAMS")/tracks/track_manifest.tsv" \
+    --longclip-bam-dir "$ROOT_DIR/$(yaml_get results_longclip "$PARAMS")/bam" \
+    --sequence-dir "$ROOT_DIR/results/tracks" \
+    --nad      "$ROOT_DIR/nad/results/11_tracks/track_manifest.tsv" \
     --out      "$TRACK_DIR/hub.txt"
 
 log_info "Stage 21 complete."
