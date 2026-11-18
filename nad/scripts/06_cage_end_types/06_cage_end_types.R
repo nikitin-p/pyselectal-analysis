@@ -273,7 +273,8 @@ p <- ggplot(ob, aes(y = type)) +
   theme_bw(base_size = 9) +
   theme(panel.grid.minor = element_blank(), panel.grid.major.y = element_blank(),
         strip.text = element_text(hjust = 0), plot.subtitle = element_text(size = 8))
-ggsave(file.path(figdir, "06_end_types_nad_vs_control.pdf"), p,
-       width = 2.6 * length(runs) + 1, height = 0.32 * length(REPORTED) + 2.2)
+for (ext in c("pdf", "png"))   # the png is what the Quarto report embeds
+  ggsave(file.path(figdir, paste0("06_end_types_nad_vs_control.", ext)), p,
+         width = 2.6 * length(runs) + 1, height = 0.32 * length(REPORTED) + 2.2, dpi = 150)
 
 sessionInfo()

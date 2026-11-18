@@ -12,7 +12,7 @@
 #
 # Outputs (in --outdir): read_classes.tsv pairs.tsv enrich_pairs.tsv pca.tsv
 #   cooks.tsv drivers_<strain>.tsv loo.tsv verdict.tsv
-#   and in --figdir: 12_pairs_<strain>.pdf 12_pca.pdf 12_distance.pdf 12_loo.pdf
+#   and in --figdir: 12_pairs_<strain>.pdf 12_distance.pdf (12_pca, 12_loo: 12b_figures.R)
 # --self-test writes the same tables for one synthetic strain into
 #   <outdir>/selftest/ and checks that the rule flags only the noised run.
 
@@ -303,25 +303,13 @@ fw(tab("cooks"), "cooks.tsv")
 fw(tab("loo"), "loo.tsv")
 for (i in seq_along(out)) fw(out[[i]]$drivers, sprintf("drivers_%s.tsv", names(inputs)[i]))
 
-pca <- tab("pca")
-p <- ggplot(pca, aes(PC1, PC2, colour = library, label = lab)) + geom_point(size = 2) +
-  geom_text(size = 2.6, vjust = -0.8, show.legend = FALSE) + facet_wrap(~ strain, scales = "free") +
-  scale_colour_manual(values = c(S = "#e63946", N = "#457b9d")) +
-  labs(title = "PCA of VST, nuclear unmasked positions") + theme_bw(base_size = 10)
-ggsave(file.path(figdir, "12_pca.pdf"), p, width = 9, height = 4.5)
+# 12_pca.pdf and 12_loo.pdf are drawn on the Mac from pca.tsv and loo.tsv by 12b_figures.R.
 p <- ggplot(tab("dist"), aes(a, b, fill = d)) + geom_tile() + geom_text(aes(label = round(d)), size = 2.4) +
   facet_wrap(~ strain, scales = "free") + scale_fill_gradient(low = "#ffffff", high = "#1d3557", name = "distance") +
   labs(x = NULL, y = NULL, title = "Euclidean distance of VST, nuclear unmasked positions") +
   theme_bw(base_size = 9) + theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ggsave(file.path(figdir, "12_distance.pdf"), p, width = 9, height = 4.5)
 loo <- tab("loo")
-p <- ggplot(loo, aes(lab, enriched, fill = substr(lab, 1, 1))) + geom_col() +
-  geom_hline(aes(yintercept = full_enriched), linetype = "dashed", linewidth = 0.3) +
-  geom_text(aes(label = sprintf("J=%.2f", jaccard)), vjust = -0.3, size = 2.4) +
-  facet_wrap(~ strain, scales = "free_y") + scale_fill_manual(values = c(S = "#e63946", N = "#457b9d"), guide = "none") +
-  labs(x = "dropped run", y = "enriched unmasked positions",
-       title = "Leave-one-out DESeq2 (dashed: full fit; J: Jaccard with full calls)") + theme_bw(base_size = 10)
-ggsave(file.path(figdir, "12_loo.pdf"), p, width = 9, height = 4)
 
 verdict <- tab("verdict"); fw(verdict, "verdict.tsv")
 cat("\n== nuclear unmasked pairs\n"); print(tab("pairs")[class == "nuclear", .(strain, lab_a, lab_b, n,

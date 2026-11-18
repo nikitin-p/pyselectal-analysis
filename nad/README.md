@@ -309,16 +309,21 @@ which differ from those of the CAGE libraries. The data at hand cannot test
 this, since a test needs CAGE and NAD captureSeq of the same RNA.
 
 The earlier NAD captureSeq study of Walters et al. 2017 (PNAS 114:480, GEO
-GSE90636) points the same way. Its abstract states that NAD-RNA is found only on
-those mitochondrial transcripts whose 5′ ends are not processed, and the
-literature summary in `nad/summaries/alternative_caps_in_s_cerevisiae_claude_summary.md`
-lists ATP9, COX2 and the 15S and 21S rRNAs among them. ATP9 starts at 46079 and
-the 15S rRNA precursor starts at 6470, so the two sites that are missing from the
-Zhang et al. 2020 libraries would carry NAD in the Walters libraries. The gene
-list has been taken from the summary and has not yet been checked against the
-full text or the supplementary tables of the PNAS paper. The two studies differ
-in size selection, since Walters et al. excluded RNAs shorter than about 200 nt,
-so GSE90636 is the natural dataset for a direct test at 6470 and 46079.
+GSE90636) points the same way. The full text, checked on 2026-11-18, names ATP9,
+COX2 and the 15S and 21S rRNAs as the only mitochondrial RNAs enriched in the
+NAD-RNA population, finds no enrichment of COX1, and links NAD to the
+mitochondrial transcripts that are not 5′-end processed. It also states that the
+NAD-RNA-Seq reads of the ATP9 and COX2 mRNAs extend to the transcription start
+site. ATP9 starts at 46079 and the 15S rRNA precursor starts at 6470, so the two
+sites that are missing from the Zhang et al. 2020 libraries carry NAD in the
+Walters libraries, which come from BY4742 grown in YEPD or minimal medium. The
+claim of the literature summary that Walters et al. excluded RNAs shorter than
+about 200 nt is not found in the paper or in the GEO record: the GEO protocol
+states that total RNA was neither rRNA-depleted nor fragmented before capture,
+and the paper names no size cutoff. The Walters libraries are whole-transcript
+RNA-seq of the captured, unfragmented RNA rather than 5′-end libraries, so GSE90636 can show
+whether ADPRC-dependent coverage reaches 6470 and 46079, but it cannot place an
+NAD 5′ end at single-nucleotide resolution.
 
 The conclusion is that most mitochondrial promoter starts with a `1Sa` excess in
 CAGE are NAD 5′ ends in NAD captureSeq, which agrees with the hypothesis that an
@@ -341,9 +346,12 @@ exactly. A position counts as NAD-detected when at least two of the three S runs
 carry a read and the mean normalised S exceeds twice the mean normalised N.
 `1Sa` positions are compared with the other candidates by a stratified label
 permutation over the −1 base, the A-run length and the CAGE depth bin, as in
-step 6. The script `08_1Sa_positions.R` runs directly with `Rscript` and has no
-wrapper. It writes its tables to `nad/results/08_1Sa_positions/` and the figure
-to `nad/figures/08_1Sa_positions.pdf`.
+step 6. The wrapper `nad/scripts/08_1Sa_positions/run.sh` checks the inputs,
+skips the step when `nad_signal.tsv` exists unless `--force` is given, and writes
+the tables to `nad/results/08_1Sa_positions/` and the figure to
+`nad/figures/08_1Sa_positions.pdf`. With `--self-test` it runs the shuffled-null
+and the 30 % plant checks instead, into `selftest_null/` and `selftest_plant/`
+under the same results folder, so that the real tables are never overwritten.
 
 The checks pass. The recomputed signal reproduces the `meanS` and `meanN` of step 5
 to within 5e-15 on all shared positions. With the NAD values shuffled within
@@ -496,6 +504,59 @@ libraries carry more normalised signal than S over the rDNA and other masked
 ncRNA (the total of the difference track is negative), so a window holding rDNA
 should be read on N as well as on S.
 
+## Replicate concordance of the NAD captureSeq libraries (step 12)
+
+Step 12 (`nad/scripts/12_replicate_qc/run.sh`, vavilov, env `r_nad`, spec
+`docs/specs/2026-11-16-nad-step12-replicate-qc.md`) asks whether the three
+replicates of each library agree as well as counting noise allows at their
+depths, and whether WT S rep1 (SRR11236402), which lay apart on an exploratory
+PCA, should be dropped from the step-5 calls. The step uses the step-5 tested
+positions, the step-5 size factors and the blind DESeq2 VST, and it divides the
+observed Pearson r of each replicate pair on unmasked nuclear positions by a
+Poisson ceiling, which is the r that two runs of the same depth would reach if
+they differed by sampling alone. A ratio near 1 therefore means that the
+replicates differ only by counting noise. Leave-one-out (LOO) refits DESeq2 per
+strain with one of the six runs dropped and compares the calls with the full fit.
+
+The step ran as job 22389. The self-test, which adds log-normal noise
+(sdlog = 0.5) to one synthetic replicate, passed all three checks: the clean
+pairs had ratios of 0.974–1.000, the noised run had 0.913 and 0.914 with its
+partners, and the outlier rule flagged that run alone. The recomputed `meanS`
+and `meanN` reproduced step 5 to a relative difference of 5e-15 in both strains.
+
+| Strain | Run | Ratio with the two mates | Ratio of the other pair | LOO calls | LOO calls without each mate | Kept of full | Jaccard | Spearman log2FC |
+|---|---|---|---|---|---|---|---|---|
+| WT | S rep1 | 0.844, 0.765 | 0.914 | 287 | 293, 293 | 0.953 | 0.950 | 0.892 |
+| WT | S rep2 | 0.844, 0.914 | 0.765 | 293 | 287, 293 | 0.973 | 0.970 | 0.955 |
+| WT | S rep3 | 0.765, 0.914 | 0.844 | 293 | 287, 293 | 0.973 | 0.970 | 0.956 |
+| WT | N rep1 | 0.982, 0.979 | 0.972 | 299 | 300, 296 | 0.980 | 0.964 | 0.963 |
+| WT | N rep2 | 0.982, 0.972 | 0.979 | 300 | 299, 296 | 0.980 | 0.961 | 0.958 |
+| WT | N rep3 | 0.979, 0.972 | 0.982 | 296 | 299, 300 | 0.977 | 0.967 | 0.954 |
+| triple | S rep1 | 0.978, 0.979 | 0.995 | 4,060 | 3,948, 3,991 | 0.921 | 0.921 | 0.998 |
+| triple | S rep2 | 0.978, 0.995 | 0.979 | 3,948 | 4,060, 3,991 | 0.896 | 0.896 | 0.998 |
+| triple | S rep3 | 0.979, 0.995 | 0.978 | 3,991 | 4,060, 3,948 | 0.907 | 0.907 | 0.998 |
+| triple | N rep1 | 0.961, 0.951 | 0.964 | 4,034 | 3,725, 3,401 | 0.916 | 0.915 | 0.993 |
+| triple | N rep2 | 0.961, 0.964 | 0.951 | 3,725 | 4,034, 3,401 | 0.846 | 0.846 | 0.994 |
+| triple | N rep3 | 0.951, 0.964 | 0.961 | 3,401 | 4,034, 3,725 | 0.770 | 0.767 | 0.976 |
+
+The full fits hold 300 (WT) and 4,402 (triple mutant) enriched unmasked
+positions, and a LOO fit tests 3,158 and 7,548 positions respectively. The
+findings are the following:
+
+- every library except WT S sits at 95–99.5 % of its Poisson ceiling, so those replicates differ by little more than counting noise;
+- WT S rep1 is the noisiest replicate (0.84 and 0.77 of the ceiling against 0.91 for rep2–rep3, and the largest summed sample distance), so it meets the first two parts of the outlier rule;
+- dropping WT S rep1 lowers the calls to 287, against 293 when either other S replicate is dropped, and adds only one new call, so the run carries real signal and fails the third part of the rule, which is the one that separates a noisy replicate from a harmful one;
+- the WT call set is stable, since any single dropped run keeps 95–98 % of the 300 calls with a Jaccard index of 0.95–0.97;
+- the triple-mutant call set moves more (Jaccard 0.77–0.92), most of all without N rep3 (3,401 calls), but no LOO fit gains more than 13 calls and the log2FC ranks stay at a Spearman r of 0.976–0.998, so the losses are borderline positions that lose power with five runs rather than calls that one run creates.
+
+No run is an outlier, all 12 runs stay in step 5, and steps 5–11 need no rerun.
+The cluster run draws `nad/figures/12_pairs_<strain>.pdf` and `12_distance.pdf`.
+The figures `12_pca.pdf` (axes labelled with the share of variance) and
+`12_loo.pdf` (calls lost and gained without each run, relative to the full fit)
+are drawn on the Mac by `nad/scripts/12_replicate_qc/12b_figures.R` from
+`pca.tsv` and `loo.tsv`, which have to be copied from
+`nad/results/12_replicate_qc/` on vavilov.
+
 ## Caveats
 
 The caveats below limit what any result can show:
@@ -520,7 +581,7 @@ nad/
   scripts/       # one folder per step, each with a run.sh wrapper
     00_download/ 01_chrM_end_types/ 02_trim/ 03_map/ 04_ctss/
     05_deseq/ 06_cage_end_types/ 07_chrM_sites/ 08_1Sa_positions/
-    09_chrM_clip_spectrum/ 10_nad_tss_1Sa/ 11_tracks/
+    09_chrM_clip_spectrum/ 10_nad_tss_1Sa/ 11_tracks/ 12_replicate_qc/
   results/       # tables, one folder per step
   figures/       # figures, prefixed by step number
   reports/       # Quarto reports
@@ -536,9 +597,10 @@ does. The project `.gitignore` ignores any folder named `results/`, `reports/`,
 
 ## Status
 
-Steps 0–11 have been run. Step 1 (`nad/scripts/01_chrM_end_types/run.sh`, Mac)
-writes `nad/figures/01_chrM_single_A_clip.{pdf,png}`, which the report
-`nad/reports/nad_first_finding.qmd` presents. Steps 0 and 2–5 run on the vavilov
+Steps 0–12 have been run. Step 1 (`nad/scripts/01_chrM_end_types/run.sh`, Mac)
+writes `nad/figures/01_chrM_single_A_clip.{pdf,png}`. The report
+`nad/reports/nad_first_finding.qmd` presents step 1 and, since 2026-11-18, the
+results of steps 5–12, using the PNG copies of figures 06–10. Steps 0 and 2–5 run on the vavilov
 cluster through `sbatch`, and the S-versus-N test of step 5 runs in the conda
 env `r_nad` (`envs/r_nad.yml`). Step 5 found 300 enriched unmasked positions in WT
 and 4,402 in the triple mutant, and the `YAAG` positive control passed. Step 6
@@ -557,5 +619,7 @@ source is the 5′ end of the group II intron lariats. Step 10
 read in CAGE are as frequent as expected from matched background in the nucleus
 and not significantly more frequent on chrM. Step 11
 (`nad/scripts/11_tracks/`, Mac) wrote the NAD captureSeq bigWigs and added them
-to the Stage 21 hub. The branch has not been given a
+to the Stage 21 hub. Step 12 (`nad/scripts/12_replicate_qc/`, cluster) found
+no outlier among the 12 runs: WT S rep1 is noisier than its mates, but dropping
+it removes calls rather than adding them, so step 5 stands as run. The branch has not been given a
 number in `docs/stages.md`.

@@ -181,6 +181,7 @@ pB <- ggplot(pc, aes(factor(offset), row, fill = log10(meanS + 1))) +
 
 p <- wrap_elements(pA) / pB + plot_layout(heights = c(1, 0.9))
 ggsave(fig_pdf, p, width = 10, height = 8)
+ggsave(sub("\\.pdf$", ".png", fig_pdf), p, width = 10, height = 8, dpi = 150)   # for the Quarto report
 message("wrote ", out_tsv, " and ", fig_pdf)
 
 sessionInfo()

@@ -336,9 +336,10 @@ pC <- ggplot(r3, aes(set, 100 * share)) +
                           END_TYPE_CANONICAL)) +
   th
 
-ggsave(file.path(figdir, "08_1Sa_positions.pdf"),
-       pA / (pB | pC + plot_layout()) + plot_layout(heights = c(1.1, 1)),
-       width = 10, height = 8)
+for (ext in c("pdf", "png"))   # the png is what the Quarto report embeds
+  ggsave(file.path(figdir, paste0("08_1Sa_positions.", ext)),
+         pA / (pB | pC + plot_layout()) + plot_layout(heights = c(1.1, 1)),
+         width = 10, height = 8, dpi = 150)
 
 for (k in checks) msg("[%s] %s", if (k[2] == "TRUE") "PASS" else "FAIL", k[1])
 msg("[INFO] nuclear candidates %d, single-A-clip-rich (>= %.0f %%) %d", nrow(nuc), 100 * MAIN_T,

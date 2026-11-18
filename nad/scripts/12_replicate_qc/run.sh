@@ -8,7 +8,8 @@
 # Spec: docs/specs/2026-11-16-nad-step12-replicate-qc.md
 #
 # Outputs: nad/results/12_replicate_qc/{read_classes,pairs,enrich_pairs,pca,cooks,loo,verdict}.tsv,
-#          drivers_<strain>.tsv; nad/figures/12_{pairs_<strain>,pca,distance,loo}.pdf
+#          drivers_<strain>.tsv; nad/figures/12_{pairs_<strain>,distance}.pdf
+#          (12_pca.pdf and 12_loo.pdf: Rscript nad/scripts/12_replicate_qc/12b_figures.R on the Mac)
 #          --self-test: the same tables for a synthetic strain in nad/results/12_replicate_qc/selftest/
 # Idempotent: skips if verdict.tsv exists, unless --force (the self-test always runs).
 # RSCRIPT in the environment overrides the Rscript of the r_nad env.
